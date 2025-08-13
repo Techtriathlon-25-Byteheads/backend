@@ -1,0 +1,487 @@
+<TASK>
+Following is a app idea, tech stack, important info and db schema for a governmet  agency boocking app. 
+Your task is to implement the API/Backend for this application. 
+YOU MUST IMPLEMENT ALL THE FEATURES DESCRIBED BELOW.
+</TASK>
+
+<APP_IDEA>
+---
+
+1. client App — User Flow
+
+1.1 App Launch & Setup
+
+1. User opens app
+
+
+2. Language selection screen → User selects preferred language.
+
+
+3. Login / Sign Up screen
+
+Login path: Enter phone number + NIC → OTP sent to phone → Verify OTP → Proceed to Home.
+
+Sign Up path: Enter
+
+Full name
+
+NIC
+
+DOB
+
+Address
+
+Contact number
+
+
+
+Check if NIC exists
+
+If yes → Prompt to log in instead.
+
+If no → OTP sent → Verify OTP → Proceed to Home.
+
+
+
+Rule: One NIC per account, but multiple NICs can be linked to a single phone number.
+
+OTP requirement: Only during signup or first login.
+
+
+
+
+
+---
+
+1.2 Home Screen
+
+Two main buttons:
+
+1. Book an Appointment
+
+
+2. Try 'Nawariyan' AI
+
+3. See past and ongoing appointment 
+
+4. See my documents
+
+
+
+
+
+---
+
+1.3 Book an Appointment Flow
+
+1. Select Department
+
+
+
+
+2. Select Service (each dep will have their own services, and the user will be able to select one) 
+(based on the department it will show the services from that dep)
+Select the location of the department based on headOfficeAddress
+
+3. Selects Time slot
+
+This is how our appointment scheduling system (queue system works)
+
+The booking window is from 7am to 4pm, with 12-1pm closed for lunch. The day is divided into hour per day slots. So 8 slots. 
+
+There can only be X appointments in the queue for a single time slot. (X set by admin panel)
+
+Slots are allocated per first come first serve. When the user selects a date, they will be shown available slots (slots with less than 6 people in the queue). They can select a slot, and the number of people in the queue will go up by one. 
+
+5. Confirm booking.
+
+
+6. Backend updates queue system.
+
+
+7. SMS confirmation sent to the user.
+
+
+
+
+
+
+1.5 Extra client App Features
+
+Push & in-app notifications from backend
+
+
+
+---
+
+2. Admin Dashboard — User Flow
+
+All users in the department admin system have credentials given by the government. They have a staff email and a password. 
+
+There is no registration page, but only a login page.
+
+
+secure dashboard for government officials to view, manage, and confirm the appointments scheduled for their specific department. An interface to review the pre-submitted documents and communicate with the citizen if any corrections are needed before the scheduled appointment.
+
+What this means is, they will see all appointment and they can click on one and see all the submited document they submitted, they will then have a approve, reject as well as a add remarks thing for each doc. Once they mark each doc, they can either reject the entire appointment, or approve it, tey can also add extra remarks. They these info will get send to the user. (so whther each doc is approves/not and all the extra info with it)
+
+Also there must be a system where admin users can book a appointment for walk in clients. They will basically use the same system users use through the app and book a slot for a perticualr service from that dep.
+
+super admin.
+
+Highest priv level user. They can add more deps, configure their services and basically manage/edit/delte/add deps and their services
+
+
+
+---
+
+3. Queue Update Rules
+
+Queue size is updated when:
+
+1. cleints books an appointment via the app.
+
+
+2. Front desk books an appointment for a walk-in.
+
+
+---
+
+</APP_IDEA>
+
+<TECH_STACK>
+MySQL prisma
+Node
+Typescript
+Express
+JWT
+</TECH_STACK>
+
+<IMPORTANT>
+Implement JWT authentication for the multiple levels of accesss/privileges described above
+keep eveything typesafe.
+make a changes.txt and update it with any changes to the db schema you do
+Try to use the db shema as reference to what needs to be implemented, but if it has columns for features that are not described above leaver them, and add null to them. We will be implementing them in the fufutre not now
+
+Make a DOCS.md with api documentation showing how to use this api
+
+
+<CURRENT_SCHEMA>
+
+YOU CAN MAKE CHANGES TO THIS IF NECASSARY
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// --------------------------------------------------
+// ENUMERATIONS
+// --------------------------------------------------
+
+enum ServiceCategory {
+  licensing
+  permits
+  certificates
+  registration
+  tax
+  social
+  legal
+  other
+}
+
+enum Gender {
+  M
+  F
+  Other
+  Prefer_not_to_say @map("Prefer not to say")
+}
+
+enum ReportType {
+  application
+  certificate
+  permit
+  license
+  receipt
+  status_update
+  other
+}
+
+enum AppointmentStatus {
+  scheduled
+  confirmed
+  in_progress
+  completed
+  cancelled
+  no_show
+  rescheduled
+}
+
+enum AppointmentType {
+  new_application
+  document_collection
+  consultation
+  followup
+  renewal
+}
+
+enum PriorityLevel {
+  normal
+  urgent
+  emergency
+}
+
+enum ChatMessageType {
+  citizen
+  agent
+  system
+  bot
+}
+
+enum LoginAccessMethod {
+  web
+  mobile_app
+  api
+  kiosk
+}
+
+enum LoginMethod {
+  password
+  otp
+  oauth
+  biometric
+  digital_id
+}
+
+enum OtpType {
+  login
+  password_reset
+  email_verification
+  phone_verification
+  transaction_auth
+}
+
+enum OtpDeliveryMethod {
+  email
+  sms
+  app_notification
+  voice_call
+}
+
+
+// --------------------------------------------------
+// MODELS
+// --------------------------------------------------
+
+/// Represents government departments.
+model DimDepartments {
+  departmentId      String                  @id @map("department_id") @db.Char(10)
+  departmentName    String?                 @map("department_name") @db.VarChar(100)
+  description       String?                 @db.Text
+  headOfficeAddress Json?                   @map("head_office_address")
+  contactInfo       Json?                   @map("contact_info")
+  operatingHours    Json?                   @map("operating_hours")
+  isActive          Boolean?                @default(true) @map("is_active")
+  createdAt         DateTime?               @default(now()) @map("created_at") @db.Timestamp()
+  services          DimDepartmentService[]
+  appointments      FactAppointments[]
+
+  @@map("DIM_departments")
+  @@index([isActive], map: "idx_active")
+}
+
+/// Represents the services offered by departments.
+model DimServices {
+  serviceId            String                  @id @map("service_id") @db.Char(10)
+  serviceName          String?                 @map("service_name") @db.VarChar(100)
+  description          String?                 @db.Text
+  serviceCategory      ServiceCategory?        @default(other) @map("service_category")
+  processingTimeDays   Int?                    @map("processing_time_days") @db.SmallInt
+  feeAmount            Decimal?                @default(0.00) @map("fee_amount") @db.Decimal(10, 2)
+  requiredDocuments    Json?                   @map("required_documents")
+  eligibilityCriteria  String?                 @map("eligibility_criteria") @db.Text
+  onlineAvailable      Boolean?                @default(true) @map("online_available")
+  appointmentRequired  Boolean?                @default(false) @map("appointment_required")
+  isActive             Boolean?                @default(true) @map("is_active")
+  createdAt            DateTime?               @default(now()) @map("created_at") @db.Timestamp()
+  updatedAt            DateTime?               @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
+  departments          DimDepartmentService[]
+  appointments         FactAppointments[]
+
+  @@map("DIM_services")
+  @@index([serviceCategory, isActive], map: "idx_category_active")
+  @@index([onlineAvailable, appointmentRequired], map: "idx_online_appointment")
+  @@index([feeAmount], map: "idx_fee_range")
+}
+
+/// Join table for the many-to-many relationship between Departments and Services.
+model DimDepartmentService {
+  departmentId  String          @map("department_id") @db.Char(10)
+  serviceId     String          @map("service_id") @db.Char(10)
+  department    DimDepartments  @relation(fields: [departmentId], references: [departmentId], onDelete: Cascade, onUpdate: Cascade, map: "fk_deptservice_dept")
+  service       DimServices     @relation(fields: [serviceId], references: [serviceId], onDelete: Cascade, onUpdate: Cascade, map: "fk_deptservice_service")
+
+  @@id([departmentId, serviceId])
+  @@map("DIM_departmentservice")
+  @@index([serviceId, departmentId], map: "idx_service_dept")
+  @@index([departmentId], map: "idx_primary_services")
+}
+
+/// Represents users of the government services platform.
+model DimUsers {
+  userId             String             @id @map("user_id") @db.Char(10)
+  username           String             @db.VarChar(50)
+  passwordHash       String             @map("password_hash") @db.VarChar(255)
+  email              String?            @unique(map: "uk_email") @db.VarChar(100)
+  firstName          String?            @map("first_name") @db.VarChar(50)
+  lastName           String?            @map("last_name") @db.VarChar(50)
+  phone              String?            @db.VarChar(20)
+  nationalId         String?            @unique(map: "uk_national_id") @map("national_id") @db.VarChar(20)
+  dateOfBirth        DateTime?          @map("date_of_birth") @db.Date
+  gender             Gender?
+  address            Json?
+  preferredLanguage  String?            @default("EN") @map("preferred_language") @db.Char(2)
+  isVerified         Boolean?           @default(false) @map("is_verified")
+  isActive           Boolean?           @default(true) @map("is_active")
+  createdAt          DateTime?          @default(now()) @map("created_at") @db.Timestamp()
+  updatedAt          DateTime?          @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
+  reportsCreated     DimReports[]
+  appointments       FactAppointments[]
+  chatLogs           FactChatLogs[]
+  logins             FactLogins[]
+  otps               FactOtp[]
+
+  @@map("DIM_users")
+  @@index([email, isActive], map: "idx_email_active")
+  @@index([isVerified, isActive], map: "idx_verification_status")
+  @@index([createdAt], map: "idx_created_at")
+}
+
+/// Represents generated reports, certificates, licenses, etc.
+model DimReports {
+  reportId         String             @id @map("report_id") @db.Char(10)
+  reportTitle      String?            @map("report_title") @db.VarChar(200)
+  reportContent    String?            @map("report_content") @db.LongText
+  reportType       ReportType?        @default(other) @map("report_type")
+  documentNumber   String?            @unique(map: "document_number_UNIQUE") @map("document_number") @db.VarChar(50)
+  filePath         String?            @map("file_path") @db.VarChar(500)
+  fileType         String?            @map("file_type") @db.VarChar(10)
+  digitalSignature String?            @map("digital_signature") @db.Text
+  createdBy        String?            @map("created_by") @db.Char(10)
+  createdAt        DateTime?          @default(now()) @map("created_at") @db.Timestamp()
+  expiresAt        DateTime?          @map("expires_at") @db.Timestamp()
+  creator          DimUsers?          @relation(fields: [createdBy], references: [userId], onDelete: SetNull, onUpdate: Cascade, map: "fk_reports_created_by")
+  appointments     FactAppointments[]
+
+  @@map("DIM_reports")
+  @@index([reportType, createdAt], map: "idx_type_created")
+  @@index([expiresAt], map: "idx_expiration")
+  @@index([createdBy], map: "idx_created_by")
+}
+
+/// Transactional table for appointments.
+model FactAppointments {
+  appointmentId     String           @id @map("appointment_id") @db.Char(10)
+  userId            String           @map("user_id") @db.Char(10)
+  departmentId      String           @map("department_id") @db.Char(10)
+  serviceId         String           @map("service_id") @db.Char(10)
+  reportId          String?          @map("report_id") @db.Char(10)
+  appointmentDate   DateTime?        @map("appointment_date") @db.Date
+  appointmentTime   DateTime?        @map("appointment_time") @db.Time
+  status            AppointmentStatus? @default(scheduled)
+  appointmentType   AppointmentType? @default(new_application) @map("appointment_type")
+  priorityLevel     PriorityLevel?   @default(normal) @map("priority_level")
+  queueNumber       String?          @map("queue_number") @db.VarChar(20)
+  estimatedDuration Int?             @default(30) @map("estimated_duration") @db.SmallInt
+  notes             String?          @db.Text
+  createdAt         DateTime?        @default(now()) @map("created_at") @db.Timestamp()
+  updatedAt         DateTime?        @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
+  department        DimDepartments   @relation(fields: [departmentId], references: [departmentId], onDelete: Restrict, onUpdate: Cascade, map: "fk_appointments_department")
+  report            DimReports?      @relation(fields: [reportId], references: [reportId], onDelete: SetNull, onUpdate: Cascade, map: "fk_appointments_report")
+  service           DimServices      @relation(fields: [serviceId], references: [serviceId], onDelete: Restrict, onUpdate: Cascade, map: "fk_appointments_service")
+  user              DimUsers         @relation(fields: [userId], references: [userId], onDelete: Cascade, onUpdate: Cascade, map: "fk_appointments_user")
+
+  @@map("FACT_appointments")
+  @@index([userId, appointmentDate], map: "idx_user_date")
+  @@index([departmentId, appointmentDate, appointmentTime], map: "idx_dept_date_time")
+  @@index([serviceId, appointmentDate], map: "idx_service_date")
+  @@index([status, appointmentDate], map: "idx_status_date")
+  @@index([appointmentType, appointmentDate], map: "idx_appointment_type")
+  @@index([departmentId, appointmentDate, queueNumber], map: "idx_queue_management")
+  @@index([reportId], map: "fk_appointments_report_idx") // Prisma requires a name for the index.
+}
+
+/// Transactional table for chat logs.
+model FactChatLogs {
+  logId             BigInt           @id @default(autoincrement()) @map("log_id") @db.UnsignedBigInt
+  userId            String           @map("user_id") @db.Char(10)
+  sessionId         String?          @map("session_id") @db.Char(36)
+  messageType       ChatMessageType? @default(citizen) @map("message_type")
+  message           String?          @db.Text
+  isResolved        Boolean?         @default(false) @map("is_resolved")
+  satisfactionRating Int?            @map("satisfaction_rating") @db.TinyInt
+  timestamp         DateTime?        @default(now()) @db.Timestamp()
+  ipAddress         String?          @map("ip_address") @db.VarChar(45)
+  user              DimUsers         @relation(fields: [userId], references: [userId], onDelete: Cascade, onUpdate: Cascade, map: "fk_chat_logs_user")
+
+  @@map("FACT_chat_logs")
+  @@index([userId, timestamp], map: "idx_user_timestamp")
+  @@index([sessionId, timestamp], map: "idx_session_timestamp")
+  @@index([isResolved, timestamp], map: "idx_resolution_status")
+}
+
+/// Transactional table for user login events.
+model FactLogins {
+  loginId          BigInt             @id @default(autoincrement()) @map("login_id") @db.UnsignedBigInt
+  userId           String             @map("user_id") @db.Char(10)
+  loginTimestamp   DateTime           @default(now()) @map("login_timestamp") @db.Timestamp()
+  logoutTimestamp  DateTime?          @map("logout_timestamp") @db.Timestamp()
+  ipAddress        String?            @map("ip_address") @db.VarChar(45)
+  userAgent        String?            @map("user_agent") @db.VarChar(500)
+  locationCity     String?            @map("location_city") @db.VarChar(100)
+  locationCountry  String?            @map("location_country") @db.Char(2)
+  accessMethod     LoginAccessMethod? @default(web) @map("access_method")
+  loginMethod      LoginMethod?       @default(password) @map("login_method")
+  success          Boolean?           @default(true)
+  failureReason    String?            @map("failure_reason") @db.VarChar(100)
+  sessionDuration  Int?               @map("session_duration")
+  user             DimUsers           @relation(fields: [userId], references: [userId], onDelete: Cascade, onUpdate: Cascade, map: "fk_logins_user")
+
+  @@map("FACT_logins")
+  @@index([userId, loginTimestamp], map: "idx_user_login_time")
+  @@index([loginTimestamp], map: "idx_timestamp")
+  @@index([success, loginTimestamp], map: "idx_success_timestamp")
+  @@index([accessMethod, loginTimestamp], map: "idx_access_method")
+}
+
+/// Transactional table for One-Time Passwords (OTPs).
+model FactOtp {
+  otpId           BigInt            @id @default(autoincrement()) @map("otp_id") @db.UnsignedBigInt
+  userId          String            @map("user_id") @db.Char(10)
+  otpCode         String?           @map("otp_code") @db.Char(6)
+  otpType         OtpType?          @default(login) @map("otp_type")
+  deliveryMethod  OtpDeliveryMethod? @default(email) @map("delivery_method")
+  createdAt       DateTime?         @default(now()) @map("created_at") @db.Timestamp()
+  expiresAt       DateTime?         @map("expires_at") @db.Timestamp()
+  usedAt          DateTime?         @map("used_at") @db.Timestamp()
+  attempts        Int?              @default(0) @db.TinyInt
+  maxAttempts     Int?              @default(3) @map("max_attempts") @db.TinyInt
+  isActive        Boolean?          @default(true) @map("is_active")
+  user            DimUsers          @relation(fields: [userId], references: [userId], onDelete: Cascade, onUpdate: Cascade, map: "fk_otp_user")
+
+  @@map("FACT_otp")
+  @@index([userId, otpType, isActive], map: "idx_user_type_active")
+  @@index([expiresAt, isActive], map: "idx_expires_cleanup")
+  @@index([userId, otpCode, otpType, isActive], map: "idx_verification_lookup")
+}
+
+
+// Note on Stored Procedures:
+// The original SQL schema included stored procedures like `CheckServiceEligibility` and `GenerateRequestId`.
+// Prisma does not manage stored procedures within the schema file. These must be created and managed
+// directly in the database. You can interact with them using Prisma's raw query capabilities.
+</CURRENT_SCHEMA>

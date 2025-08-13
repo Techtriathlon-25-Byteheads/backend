@@ -1,0 +1,10 @@
+1. Added `Role` enum with values `CITIZEN`, `ADMIN`, `SUPER_ADMIN`.
+2. Added `role` field to `DimUsers` model with a default value of `CITIZEN`.
+3. Made `username` and `passwordHash` optional in `DimUsers` to accommodate citizen users who log in with NIC and phone.
+4. Modified `SubmittedDocument` model to remove file-specific fields (`fileName`, `filePath`).
+5. Added `externalDocumentId` to `SubmittedDocument` to store the ID from the external document service.
+6. Migrated database provider from MySQL to PostgreSQL in `schema.prisma`.
+7. Updated database-specific types in `schema.prisma` for PostgreSQL compatibility (e.g., `db.Char` to `db.VarChar`, `db.Timestamp` to `db.Timestamp(3)`, `db.LongText` to `db.Text`, `db.UnsignedBigInt` to `db.BigInt`, `db.TinyInt` to `db.SmallInt`).
+8. Increased `userId` column length in `DimUsers` from `db.VarChar(10)` to `db.VarChar(25)` to accommodate generated IDs.
+9. Increased `userId` column length in `FactAppointments`, `FactChatLogs`, `FactLogins`, and `FactOtp` to `db.VarChar(25)` to match `DimUsers.userId` length.
+10. Added `maxCapacityPerSlot` (Int) to `DimServices` model to define the maximum number of citizens per time slot for a service.
