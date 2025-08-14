@@ -545,3 +545,154 @@ Update the status of a submitted document.
     "updatedAt": "2025-08-13T12:10:00.000Z"
 }
 ```
+
+---
+
+## Real-time System (WebSockets)
+
+The system provides real-time queue updates and appointment booking using WebSockets via the Socket.IO library.
+
+### Connection
+
+Clients should connect to the root of the server URL.
+
+**Example (Client-side JavaScript):**
+
+```javascript
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:3000", {
+  auth: {
+    token: "<your_jwt_token>" // See Authentication section
+  }
+});
+
+socket.on("connect", () => {
+  console.log("Connected to the server!", socket.id);
+});
+
+socket.on("disconnect", () => {
+  console.log("Disconnected from the server.");
+});
+```
+
+### Authentication
+
+The WebSocket connection is authenticated using the same JWT token as the REST API. The token **must** be passed in the `auth.token` field during the initial connection setup.
+
+If the token is missing or invalid, the server will refuse the connection.
+
+### Events
+
+The following section details the events you can use to interact with the real-time system.
+
+#### `emit`: Client-to-Server Events
+
+These are events that the client application should emit to the server.
+
+**1. `join_service_queue`**
+
+Joins a room to receive real-time updates for a specific service queue. The client should emit this event when a user views a service they might book an appointment for.
+
+*   **Payload:** `string` - The `serviceId` of the queue to watch.
+*   **Example:**
+    ```javascript
+    socket.emit('join_service_queue', 'SER1723532294023');
+    ```
+
+**2. `book_appointment`**
+
+Books a new appointment. This is the real-time equivalent of the `POST /appointments` REST endpoint.
+
+*   **Payload:** `object` - The appointment details.
+*   **Payload Structure:**
+    ```json
+    {
+        "departmentId": "DEP1723532294023",
+        "serviceId": "SER1723532294023",
+        "appointmentDate": "2025-12-25", // Format: YYYY-MM-DD
+        "appointmentTime": "10:00",      // Format: HH:MM
+        "notes": "I need this urgently."
+    }
+    ```
+*   **Example:**
+    ```javascript
+    const appointmentDetails = { /* ...payload structure... */ };
+    socket.emit('book_appointment', appointmentDetails);
+    ```
+
+#### `on`: Server-to-Client Events
+
+These are events that the client application should listen for.
+
+**1. `queue_update`**
+
+Provides the current queue size for a service. This is sent immediately after a client joins a service queue and is broadcast to all clients in that queue's room whenever a new appointment is booked.
+
+*   **Payload:** `object`
+*   **Payload Structure:**
+    ```json
+    {
+        "serviceId": "SER1723532294023",
+        "queueCount": 5
+    }
+    ```
+*   **Example:**
+    ```javascript
+    socket.on('queue_update', (data) => {
+      console.log(`Queue for service ${data.serviceId} is now ${data.queueCount}`);
+      // Update UI here
+    });
+    ```
+
+**2. `appointment_booked`**
+
+Confirms to the originating user that their appointment was successfully created. The payload is the full appointment object.
+
+*   **Payload:** `Appointment Object` (See structure in REST API docs)
+*   **Example:**
+    ```javascript
+    socket.on('appointment_booked', (appointment) => {
+      console.log('Appointment successfully booked:', appointment);
+      // Navigate to confirmation page
+    });
+    ```
+
+**3. `admin_queue_update` (Admins Only)**
+
+Sent only to authenticated admin/superadmin clients. This event fires whenever *any* service queue changes, allowing for a real-time dashboard view of the entire system.
+
+*   **Payload:** `object`
+*   **Payload Structure:**
+    ```json
+    {
+        "serviceId": "SER1723532294023",
+        "queueCount": 6
+    }
+    ```
+*   **Example:**
+    ```javascript
+    socket.on('admin_queue_update', (data) => {
+      console.log(`ADMIN VIEW: Queue for ${data.serviceId} is now ${data.queueCount}`);
+      // Update admin dashboard UI
+    });
+    ```
+
+**4. `error`**
+
+Sent by the server if an operation fails (e.g., invalid data for booking, authentication error).
+
+*   **Payload:** `object`
+*   **Payload Structure:**
+    ```json
+    {
+        "message": "This time slot is full."
+    }
+    ```
+*   **Example:**
+    ```javascript
+    socket.on('error', (error) => {
+      console.error('An error occurred:', error.message);
+      // Show an error message to the user
+    });
+    ```

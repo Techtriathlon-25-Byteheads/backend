@@ -76,47 +76,30 @@ export const getAvailableSlots = async (req: Request, res: Response) => {
     }
 };
 
+import { createAppointment } from '../services/appointment.service';
+
 export const bookAppointment = async (req: AuthRequest, res: Response) => {
     const { departmentId, serviceId, appointmentDate, appointmentTime, notes } = req.body;
     const userId = req.user!.userId;
 
     try {
-        const service = await prisma.dimServices.findUnique({ where: { serviceId } });
-        if (!service) {
-            return res.status(404).json({ message: 'Service not found' });
-        }
-
-        const maxCapacity = service.maxCapacityPerSlot || 6;
-
-        const bookingDate = new Date(appointmentDate);
-        const bookingTime = new Date(`1970-01-01T${appointmentTime}:00.000Z`);
-
-        const currentAppointmentsInSlot = await prisma.factAppointments.count({
-            where: {
-                serviceId,
-                appointmentDate: bookingDate,
-                appointmentTime: bookingTime,
-            },
-        });
-
-        if (currentAppointmentsInSlot >= maxCapacity) {
-            return res.status(409).json({ message: 'This time slot is full.' });
-        }
-
-        const newAppointment = await prisma.factAppointments.create({
-            data: {
-                appointmentId: `APP${Date.now()}`,
-                userId,
-                departmentId,
-                serviceId,
-                appointmentDate: bookingDate,
-                appointmentTime: bookingTime,
-                notes,
-            },
+        const newAppointment = await createAppointment({
+            userId,
+            departmentId,
+            serviceId,
+            appointmentDate,
+            appointmentTime,
+            notes,
         });
         res.status(201).json(newAppointment);
-    } catch (error) {
+    } catch (error: any) {
         console.error(error);
+        if (error.message === 'Service not found') {
+            return res.status(404).json({ message: error.message });
+        }
+        if (error.message === 'This time slot is full.') {
+            return res.status(409).json({ message: error.message });
+        }
         res.status(500).json({ message: 'Internal server error' });
     }
 };
