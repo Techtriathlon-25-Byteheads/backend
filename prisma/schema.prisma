@@ -7,9 +7,7 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// --------------------------------------------------
-// ENUMERATIONS
-// --------------------------------------------------
+// ... (rest of enums)
 
 enum Role {
   CITIZEN
@@ -111,7 +109,6 @@ enum OtpDeliveryMethod {
 // MODELS
 // --------------------------------------------------
 
-/// Represents government departments.
 model DimDepartments {
   departmentId      String                 @id @map("department_id") @db.VarChar(25)
   departmentName    String?                @map("department_name") @db.VarChar(100)
@@ -128,7 +125,6 @@ model DimDepartments {
   @@index([isActive], map: "idx_active")
 }
 
-/// Represents the services offered by departments.
 model DimServices {
   serviceId           String                 @id @map("service_id") @db.VarChar(25)
   serviceName         String?                @map("service_name") @db.VarChar(100)
@@ -146,6 +142,7 @@ model DimServices {
   updatedAt           DateTime?              @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
   departments         DimDepartmentService[]
   appointments        FactAppointments[]
+  assignedAdmins      AdminServiceAssignment[] // Relation to the new join table
 
   @@map("DIM_services")
   @@index([serviceCategory, isActive], map: "idx_category_active")
@@ -153,7 +150,6 @@ model DimServices {
   @@index([feeAmount], map: "idx_fee_range")
 }
 
-/// Join table for the many-to-many relationship between Departments and Services.
 model DimDepartmentService {
   departmentId String         @map("department_id") @db.VarChar(25)
   serviceId    String         @map("service_id") @db.VarChar(25)
@@ -166,7 +162,6 @@ model DimDepartmentService {
   @@index([departmentId], map: "idx_primary_services")
 }
 
-/// Represents users of the government services platform.
 model DimUsers {
   userId            String             @id @map("user_id") @db.VarChar(25)
   username          String?            @db.VarChar(50)
@@ -185,6 +180,7 @@ model DimUsers {
   createdAt         DateTime?          @default(now()) @map("created_at") @db.Timestamp(3)
   updatedAt         DateTime?          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
   role              Role               @default(CITIZEN)
+  assignedServices  AdminServiceAssignment[] // Relation to the new join table
   reportsCreated    DimReports[]
   appointments      FactAppointments[]
   chatLogs          FactChatLogs[]
@@ -197,11 +193,22 @@ model DimUsers {
   @@index([createdAt], map: "idx_created_at")
 }
 
-/// Represents generated reports, certificates, licenses, etc.
+// New join table for Admin-Service many-to-many relationship
+model AdminServiceAssignment {
+  admin      DimUsers    @relation(fields: [adminId], references: [userId], onDelete: Cascade)
+  adminId    String      @map("admin_id") @db.VarChar(25)
+  service    DimServices @relation(fields: [serviceId], references: [serviceId], onDelete: Cascade)
+  serviceId  String      @map("service_id") @db.VarChar(25)
+  assignedAt DateTime    @default(now())
+
+  @@id([adminId, serviceId])
+  @@map("admin_service_assignments")
+}
+
+
 model DimReports {
   reportId         String             @id @map("report_id") @db.VarChar(25)
   reportTitle      String?            @map("report_title") @db.VarChar(200)
-  // Changed from LongText to Text for PostgreSQL compatibility
   reportContent    String?            @map("report_content") @db.Text
   reportType       ReportType?        @default(other) @map("report_type")
   documentNumber   String?            @unique(map: "document_number_UNIQUE") @map("document_number") @db.VarChar(50)
@@ -220,7 +227,6 @@ model DimReports {
   @@index([createdBy], map: "idx_created_by")
 }
 
-/// Transactional table for appointments.
 model FactAppointments {
   appointmentId     String           @id @map("appointment_id") @db.VarChar(25)
   userId            String           @map("user_id") @db.VarChar(25)
@@ -270,16 +276,13 @@ model SubmittedDocument {
   @@map("SUBMITTED_documents")
 }
 
-/// Transactional table for chat logs.
 model FactChatLogs {
-  // Changed UnsignedBigInt to BigInt for PostgreSQL
   logId              BigInt           @id @default(autoincrement()) @map("log_id") @db.BigInt
   userId             String           @map("user_id") @db.VarChar(25)
   sessionId          String?          @map("session_id") @db.VarChar(36)
   messageType        ChatMessageType? @default(citizen) @map("message_type")
   message            String?          @db.Text
   isResolved         Boolean?         @default(false) @map("is_resolved")
-  // Changed TinyInt to SmallInt for PostgreSQL
   satisfactionRating Int?             @map("satisfaction_rating") @db.SmallInt
   timestamp          DateTime?        @default(now()) @db.Timestamp(3)
   ipAddress          String?          @map("ip_address") @db.VarChar(45)
@@ -291,9 +294,7 @@ model FactChatLogs {
   @@index([isResolved, timestamp], map: "idx_resolution_status")
 }
 
-/// Transactional table for user login events.
 model FactLogins {
-  // Changed UnsignedBigInt to BigInt for PostgreSQL
   loginId         BigInt             @id @default(autoincrement()) @map("login_id") @db.BigInt
   userId          String             @map("user_id") @db.VarChar(25)
   loginTimestamp  DateTime           @default(now()) @map("login_timestamp") @db.Timestamp(3)
@@ -316,9 +317,7 @@ model FactLogins {
   @@index([accessMethod, loginTimestamp], map: "idx_access_method")
 }
 
-/// Transactional table for One-Time Passwords (OTPs).
 model FactOtp {
-  // Changed UnsignedBigInt to BigInt for PostgreSQL
   otpId          BigInt             @id @default(autoincrement()) @map("otp_id") @db.BigInt
   userId         String             @map("user_id") @db.VarChar(25)
   otpCode        String?            @map("otp_code") @db.VarChar(6)
@@ -327,9 +326,7 @@ model FactOtp {
   createdAt      DateTime?          @default(now()) @map("created_at") @db.Timestamp(3)
   expiresAt      DateTime?          @map("expires_at") @db.Timestamp(3)
   usedAt         DateTime?          @map("used_at") @db.Timestamp(3)
-  // Changed TinyInt to SmallInt for PostgreSQL
   attempts       Int?               @default(0) @db.SmallInt
-  // Changed TinyInt to SmallInt for PostgreSQL
   maxAttempts    Int?               @default(3) @map("max_attempts") @db.SmallInt
   isActive       Boolean?           @default(true) @map("is_active")
   user           DimUsers           @relation(fields: [userId], references: [userId], onDelete: Cascade, onUpdate: Cascade, map: "fk_otp_user")

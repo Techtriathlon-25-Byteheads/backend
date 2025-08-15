@@ -35,8 +35,7 @@ export const signup = async (req: Request, res: Response) => {
     });
 
     const otp = await generateOtp(user.userId);
-    await sendOtp(contactNumber, otp); // This will be a mock function for now
-
+    // await sendOtp(contactNumber, otp); 
     res.status(201).json({ message: 'User created successfully. Please verify OTP.', userId: user.userId });
   } catch (error) {
     console.error(error);
