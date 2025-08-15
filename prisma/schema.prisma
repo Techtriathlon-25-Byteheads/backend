@@ -106,10 +106,53 @@ enum OtpDeliveryMethod {
   voice_call
 }
 
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
 
 // --------------------------------------------------
 // MODELS
 // --------------------------------------------------
+
+/// Represents user types with their permissions.
+model DimUserType {
+  userTypeId  String     @id @map("user_type_id") @db.VarChar(25)
+  userType    String     @map("user_type") @db.VarChar(50)
+  permissions Json?      // JSON array of permissions
+  description String?    @db.Text
+  isActive    Boolean?   @default(true) @map("is_active")
+  createdAt   DateTime?  @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt   DateTime?  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+  users       DimUsers[]
+
+  @@map("DIM_user_type")
+  @@index([isActive], map: "idx_dim_user_type_active")
+  @@index([userType], map: "idx_dim_user_type_name")
+}
+
+/// Represents available time slots for appointments.
+model DimTimeSlot {
+  timeSlotId   String             @id @map("time_slot_id") @db.VarChar(25)
+  dayOfWeek    DayOfWeek          @map("day_of_week")
+  startTime    DateTime           @map("start_time") @db.Time(3)
+  endTime      DateTime           @map("end_time") @db.Time(3)
+  isActive     Boolean?           @default(true) @map("is_active")
+  createdAt    DateTime?          @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt    DateTime?          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+  appointments FactAppointments[]
+
+  @@map("DIM_time_slot")
+  @@index([dayOfWeek, isActive], map: "idx_day_active")
+  @@index([startTime, endTime], map: "idx_time_range")
+  @@index([isActive], map: "idx_time_slot_active")
+}
 
 /// Represents government departments.
 model DimDepartments {
@@ -182,9 +225,11 @@ model DimUsers {
   preferredLanguage String?            @default("EN") @map("preferred_language") @db.VarChar(2)
   isVerified        Boolean?           @default(false) @map("is_verified")
   isActive          Boolean?           @default(true) @map("is_active")
+  userTypeId        String?            @map("user_type_id") @db.VarChar(25)
   createdAt         DateTime?          @default(now()) @map("created_at") @db.Timestamp(3)
   updatedAt         DateTime?          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
   role              Role               @default(CITIZEN)
+  userType          DimUserType?       @relation(fields: [userTypeId], references: [userTypeId], onDelete: SetNull, onUpdate: Cascade, map: "fk_users_user_type")
   reportsCreated    DimReports[]
   appointments      FactAppointments[]
   chatLogs          FactChatLogs[]
@@ -195,6 +240,7 @@ model DimUsers {
   @@index([email, isActive], map: "idx_email_active")
   @@index([isVerified, isActive], map: "idx_verification_status")
   @@index([createdAt], map: "idx_created_at")
+  @@index([userTypeId], map: "idx_user_type")
 }
 
 /// Represents generated reports, certificates, licenses, etc.
@@ -222,25 +268,27 @@ model DimReports {
 
 /// Transactional table for appointments.
 model FactAppointments {
-  appointmentId     String           @id @map("appointment_id") @db.VarChar(25)
-  userId            String           @map("user_id") @db.VarChar(25)
-  departmentId      String           @map("department_id") @db.VarChar(25)
-  serviceId         String           @map("service_id") @db.VarChar(25)
-  reportId          String?          @map("report_id") @db.VarChar(25)
-  appointmentDate   DateTime?        @map("appointment_date") @db.Date
-  appointmentTime   DateTime?        @map("appointment_time") @db.Time(3)
+  appointmentId     String            @id @map("appointment_id") @db.VarChar(25)
+  userId            String            @map("user_id") @db.VarChar(25)
+  departmentId      String            @map("department_id") @db.VarChar(25)
+  serviceId         String            @map("service_id") @db.VarChar(25)
+  reportId          String?           @map("report_id") @db.VarChar(25)
+  timeSlotId        String?           @map("time_slot_id") @db.VarChar(25)
+  appointmentDate   DateTime?         @map("appointment_date") @db.Date
+  appointmentTime   DateTime?         @map("appointment_time") @db.Time(3)
   status            AppointmentStatus? @default(scheduled)
-  appointmentType   AppointmentType? @default(new_application) @map("appointment_type")
-  priorityLevel     PriorityLevel?   @default(normal) @map("priority_level")
-  queueNumber       String?          @map("queue_number") @db.VarChar(20)
-  estimatedDuration Int?             @default(30) @map("estimated_duration") @db.SmallInt
-  notes             String?          @db.Text
-  createdAt         DateTime?        @default(now()) @map("created_at") @db.Timestamp(3)
-  updatedAt         DateTime?        @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
-  department        DimDepartments   @relation(fields: [departmentId], references: [departmentId], onDelete: Restrict, onUpdate: Cascade, map: "fk_appointments_department")
-  report            DimReports?      @relation(fields: [reportId], references: [reportId], onDelete: SetNull, onUpdate: Cascade, map: "fk_appointments_report")
-  service           DimServices      @relation(fields: [serviceId], references: [serviceId], onDelete: Restrict, onUpdate: Cascade, map: "fk_appointments_service")
-  user              DimUsers         @relation(fields: [userId], references: [userId], onDelete: Cascade, onUpdate: Cascade, map: "fk_appointments_user")
+  appointmentType   AppointmentType?  @default(new_application) @map("appointment_type")
+  priorityLevel     PriorityLevel?    @default(normal) @map("priority_level")
+  queueNumber       String?           @map("queue_number") @db.VarChar(20)
+  estimatedDuration Int?              @default(30) @map("estimated_duration") @db.SmallInt
+  notes             String?           @db.Text
+  createdAt         DateTime?         @default(now()) @map("created_at") @db.Timestamp(3)
+  updatedAt         DateTime?         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+  department        DimDepartments    @relation(fields: [departmentId], references: [departmentId], onDelete: Restrict, onUpdate: Cascade, map: "fk_appointments_department")
+  report            DimReports?       @relation(fields: [reportId], references: [reportId], onDelete: SetNull, onUpdate: Cascade, map: "fk_appointments_report")
+  service           DimServices       @relation(fields: [serviceId], references: [serviceId], onDelete: Restrict, onUpdate: Cascade, map: "fk_appointments_service")
+  user              DimUsers          @relation(fields: [userId], references: [userId], onDelete: Cascade, onUpdate: Cascade, map: "fk_appointments_user")
+  timeSlot          DimTimeSlot?      @relation(fields: [timeSlotId], references: [timeSlotId], onDelete: SetNull, onUpdate: Cascade, map: "fk_appointments_time_slot")
   submittedDocuments SubmittedDocument[]
 
   @@map("FACT_appointments")
@@ -251,6 +299,7 @@ model FactAppointments {
   @@index([appointmentType, appointmentDate], map: "idx_appointment_type")
   @@index([departmentId, appointmentDate, queueNumber], map: "idx_queue_management")
   @@index([reportId], map: "fk_appointments_report_idx")
+  @@index([timeSlotId], map: "idx_time_slot")
 }
 
 model SubmittedDocument {
@@ -331,7 +380,7 @@ model FactOtp {
   user           DimUsers           @relation(fields: [userId], references: [userId], onDelete: Cascade, onUpdate: Cascade, map: "fk_otp_user")
 
   @@map("FACT_otp")
-  @@index([userId, otpType, isActive], map: "idx_user_type_active")
+  @@index([userId, otpType, isActive], map: "idx_otp_user_type_active")
   @@index([expiresAt, isActive], map: "idx_expires_cleanup")
   @@index([userId, otpCode, otpType, isActive], map: "idx_verification_lookup")
 }
