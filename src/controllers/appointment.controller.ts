@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
 import { AuthRequest } from '../middlewares/auth.middleware';
-
-const MAX_APPOINTMENTS_PER_SLOT = 6;
+import { getDay, format } from 'date-fns';
 
 export const getServicesForDepartment = async (req: Request, res: Response) => {
     const { departmentId } = req.params;
@@ -27,25 +26,27 @@ export const getAvailableSlots = async (req: Request, res: Response) => {
     }
 
     const bookingDate = new Date(date as string);
-    const dayOfWeek = bookingDate.getDay();
-
-    // Assuming working days are Monday (1) to Friday (5)
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-        return res.status(200).json({ slots: [] });
-    }
-
-    const timeSlots = [
-        '07:00', '08:00', '09:00', '10:00', '11:00',
-        '13:00', '14:00', '15:00' // 12-1pm is lunch break
-    ];
+    const dayOfWeekName = format(bookingDate, 'EEEE').toLowerCase(); // e.g., 'monday'
 
     try {
-        const service = await prisma.dimServices.findUnique({ where: { serviceId } });
+        const service = await prisma.dimServices.findUnique({
+            where: { serviceId },
+            select: { serviceId: true, maxCapacityPerSlot: true, operationalHours: true },
+        });
+
         if (!service) {
             return res.status(404).json({ message: 'Service not found' });
         }
 
-        const maxCapacity = service.maxCapacityPerSlot || 6; // Default to 6 if not set
+        const maxCapacity = service.maxCapacityPerSlot || 6;
+        const operationalHours = service.operationalHours as Record<string, string[]> | null;
+
+        // Get valid time slots for the requested day
+        const validTimeSlots: string[] = operationalHours?.[dayOfWeekName] || [];
+
+        if (validTimeSlots.length === 0) {
+            return res.status(200).json({ slots: [] }); // Service not operational on this day
+        }
 
         const appointments = await prisma.factAppointments.groupBy({
             by: ['appointmentTime'],
@@ -58,8 +59,12 @@ export const getAvailableSlots = async (req: Request, res: Response) => {
             },
         });
 
-        const slots = timeSlots.map(slot => {
-            const appointmentCount = appointments.find(a => new Date(a.appointmentTime!).toISOString().endsWith(`${slot}:00.000Z`));
+        const slots = validTimeSlots.map(slot => {
+            const appointmentCount = appointments.find(a => {
+                // Convert stored appointmentTime (Date object) to HH:MM string for comparison
+                const storedTime = a.appointmentTime ? format(new Date(a.appointmentTime), 'HH:mm') : null;
+                return storedTime === slot;
+            });
             const currentQueueSize = appointmentCount ? appointmentCount._count.appointmentId : 0;
             return {
                 time: slot,
@@ -100,8 +105,9 @@ export const bookAppointment = async (req: AuthRequest, res: Response) => {
         if (error.message === 'This time slot is full.') {
             return res.status(409).json({ message: error.message });
         }
+        if (error.message === 'Service not operational on this day or time.') {
+            return res.status(400).json({ message: error.message });
+        }
         res.status(500).json({ message: 'Internal server error' });
     }
 };
-
-
