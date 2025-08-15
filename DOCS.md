@@ -1,5 +1,46 @@
 # API Documentation
 
+## Local Setup (Docker)
+
+The entire backend system, including the database, is containerized with Docker and can be run with a single command. This is the recommended way to run the application for local development.
+
+**Prerequisites:**
+- Docker
+- Docker Compose
+
+### 1. Configure Environment
+
+First, create a `.env` file for your local environment variables. You can copy the provided example file:
+
+```bash
+cp .env.example .env
+```
+
+Next, open the `.env` file and change the values for `JWT_SECRET` and `ENCRYPTION_KEY` to your own long, random, secret strings.
+
+### 2. Build and Run
+
+Use Docker Compose to build the API image and start both the API and PostgreSQL containers.
+
+```bash
+docker-compose up --build
+```
+
+This command will:
+- Build the Docker image for the API.
+- Start the API and database containers.
+- Automatically apply all Prisma database migrations.
+- Seed the database with a default super admin user.
+
+The API will be available at `http://localhost:3000`.
+
+### Default Super Admin Credentials
+
+- **Email:** `superadmin@gov.lk`
+- **Password:** `superadminpassword`
+
+---
+
 This document provides the definitive documentation for the Government Agency Booking App API.
 
 ## Base URL
@@ -387,27 +428,7 @@ Book a new appointment.
 
 *   **Code:** `409 Conflict` - This time slot is full.
 
-### `POST /appointments/:appointmentId/documents`
 
-Associates an externally stored document with an appointment.
-
-**Authorization:** Authenticated User
-
-**Path Parameters:**
-* `appointmentId` (string, required): The ID of the appointment.
-
-**Request Body:**
-
-```json
-{
-    "externalDocumentId": "<id_from_external_service>"
-}
-```
-
-**Success Response:**
-
-*   **Code:** `201 Created`
-*   **Content:** `The created SubmittedDocument object`
 
 ---
 
@@ -538,7 +559,11 @@ Update the status of a submitted document.
 {
     "documentId": "clv2...",
     "appointmentId": "APP1723532294023",
-    "externalDocumentId": "<id_from_external_service>",
+    "externalDocumentId": "<uuid>",
+    "filePath": "/path/to/uploads/encrypted/<uuid>",
+    "mimeType": "application/pdf",
+    "originalFilename": "mydocument.pdf",
+    "fileSizeBytes": 123456,
     "isApproved": true,
     "remarks": "Document looks good.",
     "createdAt": "2025-08-13T12:05:00.000Z",
@@ -548,151 +573,57 @@ Update the status of a submitted document.
 
 ---
 
-## Real-time System (WebSockets)
+## File Upload & Serving
 
-The system provides real-time queue updates and appointment booking using WebSockets via the Socket.IO library.
+File uploads are handled via a standard `multipart/form-data` endpoint. All uploaded files are encrypted at rest and can only be viewed via a public, unguessable link.
 
-### Connection
+### `POST /api/v1/upload`
 
-Clients should connect to the root of the server URL.
+Uploads a single file to be associated with an appointment.
 
-**Example (Client-side JavaScript):**
+**Authorization:** Authenticated User (Citizen, Admin, Super Admin)
 
-```javascript
-import { io } from "socket.io-client";
+**Request Type:** `multipart/form-data`
 
-const socket = io("http://localhost:3000", {
-  auth: {
-    token: "<your_jwt_token>" // See Authentication section
-  }
-});
+**Form Data:**
 
-socket.on("connect", () => {
-  console.log("Connected to the server!", socket.id);
-});
+*   `appointmentId` (string, required): The ID of the appointment this document belongs to.
+*   `document` (file, required): The file to upload. The field name **must** be `document`.
 
-socket.on("disconnect", () => {
-  console.log("Disconnected from the server.");
-});
-```
+**Success Response:**
 
-### Authentication
-
-The WebSocket connection is authenticated using the same JWT token as the REST API. The token **must** be passed in the `auth.token` field during the initial connection setup.
-
-If the token is missing or invalid, the server will refuse the connection.
-
-### Events
-
-The following section details the events you can use to interact with the real-time system.
-
-#### `emit`: Client-to-Server Events
-
-These are events that the client application should emit to the server.
-
-**1. `join_service_queue`**
-
-Joins a room to receive real-time updates for a specific service queue. The client should emit this event when a user views a service they might book an appointment for.
-
-*   **Payload:** `string` - The `serviceId` of the queue to watch.
-*   **Example:**
-    ```javascript
-    socket.emit('join_service_queue', 'SER1723532294023');
-    ```
-
-**2. `book_appointment`**
-
-Books a new appointment. This is the real-time equivalent of the `POST /appointments` REST endpoint.
-
-*   **Payload:** `object` - The appointment details.
-*   **Payload Structure:**
+*   **Code:** `201 Created`
+*   **Content:**
     ```json
     {
-        "departmentId": "DEP1723532294023",
-        "serviceId": "SER1723532294023",
-        "appointmentDate": "2025-12-25", // Format: YYYY-MM-DD
-        "appointmentTime": "10:00",      // Format: HH:MM
-        "notes": "I need this urgently."
+        "message": "File uploaded and encrypted successfully.",
+        "document": { ...SubmittedDocument Object... }
     }
     ```
-*   **Example:**
-    ```javascript
-    const appointmentDetails = { /* ...payload structure... */ };
-    socket.emit('book_appointment', appointmentDetails);
-    ```
 
-#### `on`: Server-to-Client Events
+**Error Responses:**
 
-These are events that the client application should listen for.
+*   **Code:** `400 Bad Request` - If `appointmentId` or the file is missing.
+*   **Code:** `500 Internal Server Error` - If there is an error during encryption or saving.
 
-**1. `queue_update`**
+### `GET /api/v1/files/:externalDocumentId`
 
-Provides the current queue size for a service. This is sent immediately after a client joins a service queue and is broadcast to all clients in that queue's room whenever a new appointment is booked.
+Serves a decrypted file for viewing. This is a public endpoint and does not require authentication. The `externalDocumentId` is generated by the server upon successful upload and is designed to be unguessable.
 
-*   **Payload:** `object`
-*   **Payload Structure:**
-    ```json
-    {
-        "serviceId": "SER1723532294023",
-        "queueCount": 5
-    }
-    ```
-*   **Example:**
-    ```javascript
-    socket.on('queue_update', (data) => {
-      console.log(`Queue for service ${data.serviceId} is now ${data.queueCount}`);
-      // Update UI here
-    });
-    ```
+**Authorization:** Public
 
-**2. `appointment_booked`**
+**Path Parameters:**
+* `externalDocumentId` (string, required): The unique ID of the document to retrieve.
 
-Confirms to the originating user that their appointment was successfully created. The payload is the full appointment object.
+**Success Response:**
 
-*   **Payload:** `Appointment Object` (See structure in REST API docs)
-*   **Example:**
-    ```javascript
-    socket.on('appointment_booked', (appointment) => {
-      console.log('Appointment successfully booked:', appointment);
-      // Navigate to confirmation page
-    });
-    ```
+*   **Code:** `200 OK`
+*   **Headers:**
+    *   `Content-Type`: The MIME type of the file (e.g., `application/pdf`).
+    *   `Content-Disposition`: `inline; filename="<original_filename>"`
+*   **Content:** The raw, decrypted file stream.
 
-**3. `admin_queue_update` (Admins Only)**
+**Error Responses:**
 
-Sent only to authenticated admin/superadmin clients. This event fires whenever *any* service queue changes, allowing for a real-time dashboard view of the entire system.
-
-*   **Payload:** `object`
-*   **Payload Structure:**
-    ```json
-    {
-        "serviceId": "SER1723532294023",
-        "queueCount": 6
-    }
-    ```
-*   **Example:**
-    ```javascript
-    socket.on('admin_queue_update', (data) => {
-      console.log(`ADMIN VIEW: Queue for ${data.serviceId} is now ${data.queueCount}`);
-      // Update admin dashboard UI
-    });
-    ```
-
-**4. `error`**
-
-Sent by the server if an operation fails (e.g., invalid data for booking, authentication error).
-
-*   **Payload:** `object`
-*   **Payload Structure:**
-    ```json
-    {
-        "message": "This time slot is full."
-    }
-    ```
-*   **Example:**
-    ```javascript
-    socket.on('error', (error) => {
-      console.error('An error occurred:', error.message);
-      // Show an error message to the user
-    });
-    ```
+*   **Code:** `404 Not Found` - If the document ID is invalid.
+*   **Code:** `500 Internal Server Error` - If there is an error during decryption.

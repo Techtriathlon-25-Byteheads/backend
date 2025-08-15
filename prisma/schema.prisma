@@ -258,7 +258,11 @@ model SubmittedDocument {
   appointmentId      String           @db.VarChar(25)
   appointment        FactAppointments @relation(fields: [appointmentId], references: [appointmentId])
   externalDocumentId String           @unique
-  isApproved         Boolean?
+  filePath           String
+  mimeType           String
+  originalFilename   String
+  fileSizeBytes      Int
+  isApproved         Boolean?         @default(false)
   remarks            String?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt

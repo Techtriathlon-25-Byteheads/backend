@@ -104,24 +104,4 @@ export const bookAppointment = async (req: AuthRequest, res: Response) => {
     }
 };
 
-export const addDocument = async (req: AuthRequest, res: Response) => {
-    const { appointmentId } = req.params;
-    const { externalDocumentId } = req.body;
 
-    if (!externalDocumentId) {
-        return res.status(400).json({ message: 'externalDocumentId is required' });
-    }
-
-    try {
-        const document = await prisma.submittedDocument.create({
-            data: {
-                appointmentId,
-                externalDocumentId,
-            },
-        });
-        res.status(201).json(document);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-};
