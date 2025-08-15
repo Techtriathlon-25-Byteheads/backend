@@ -323,7 +323,16 @@ Create a new service.
     "eligibilityCriteria": "Must be over 18 years old.",
     "onlineAvailable": true,
     "appointmentRequired": true,
-    "maxCapacityPerSlot": 10
+    "maxCapacityPerSlot": 10,
+    "operationalHours": {
+        "monday": ["09:00", "10:00", "11:00"],
+        "tuesday": [],
+        "wednesday": ["13:00", "14:00", "15:00"],
+        "thursday": ["09:00", "10:00", "11:00"],
+        "friday": ["09:00", "10:00"],
+        "saturday": [],
+        "sunday": []
+    }
 }
 ```
 
@@ -348,7 +357,12 @@ Update a service.
     "serviceName": "Driving License Renewal",
     "feeAmount": 500.00,
     "isActive": true,
-    "maxCapacityPerSlot": 8
+    "maxCapacityPerSlot": 8,
+    "operationalHours": {
+        "monday": ["09:00", "10:00", "11:00"],
+        "tuesday": [],
+        "wednesday": ["13:00", "14:00", "15:00"]
+    }
 }
 ```
 
@@ -377,7 +391,7 @@ Get all services for a specific department.
 
 ### `GET /appointments/:serviceId/slots`
 
-Get available appointment slots for a service on a specific date.
+Get available appointment slots for a service on a specific date, based on the service's defined operational hours and current bookings.
 
 **Authorization:** Public
 

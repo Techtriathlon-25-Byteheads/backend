@@ -142,7 +142,8 @@ model DimServices {
   updatedAt           DateTime?              @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
   departments         DimDepartmentService[]
   appointments        FactAppointments[]
-  assignedAdmins      AdminServiceAssignment[] // Relation to the new join table
+  assignedAdmins      AdminServiceAssignment[]
+  operationalHours    Json?                  @map("operational_hours") // New field
 
   @@map("DIM_services")
   @@index([serviceCategory, isActive], map: "idx_category_active")
@@ -180,7 +181,7 @@ model DimUsers {
   createdAt         DateTime?          @default(now()) @map("created_at") @db.Timestamp(3)
   updatedAt         DateTime?          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
   role              Role               @default(CITIZEN)
-  assignedServices  AdminServiceAssignment[] // Relation to the new join table
+  assignedServices  AdminServiceAssignment[]
   reportsCreated    DimReports[]
   appointments      FactAppointments[]
   chatLogs          FactChatLogs[]
@@ -193,7 +194,6 @@ model DimUsers {
   @@index([createdAt], map: "idx_created_at")
 }
 
-// New join table for Admin-Service many-to-many relationship
 model AdminServiceAssignment {
   admin      DimUsers    @relation(fields: [adminId], references: [userId], onDelete: Cascade)
   adminId    String      @map("admin_id") @db.VarChar(25)

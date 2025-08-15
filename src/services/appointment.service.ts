@@ -1,4 +1,5 @@
 import prisma from '../config/prisma';
+import { format } from 'date-fns';
 
 interface AppointmentData {
     userId: string;
@@ -12,7 +13,10 @@ interface AppointmentData {
 export const createAppointment = async (data: AppointmentData) => {
     const { userId, departmentId, serviceId, appointmentDate, appointmentTime, notes } = data;
 
-    const service = await prisma.dimServices.findUnique({ where: { serviceId } });
+    const service = await prisma.dimServices.findUnique({
+        where: { serviceId },
+        select: { serviceId: true, maxCapacityPerSlot: true, operationalHours: true },
+    });
     if (!service) {
         throw new Error('Service not found');
     }
@@ -20,6 +24,15 @@ export const createAppointment = async (data: AppointmentData) => {
     const maxCapacity = service.maxCapacityPerSlot || 6;
 
     const bookingDate = new Date(appointmentDate);
+    const dayOfWeekName = format(bookingDate, 'EEEE').toLowerCase();
+    const operationalHours = service.operationalHours as Record<string, string[]> | null;
+
+    // Validate against operational hours
+    const validTimeSlots: string[] = operationalHours?.[dayOfWeekName] || [];
+    if (!validTimeSlots.includes(appointmentTime)) {
+        throw new Error('Service not operational on this day or time.');
+    }
+
     const bookingTime = new Date(`1970-01-01T${appointmentTime}:00.000Z`);
 
     const currentAppointmentsInSlot = await prisma.factAppointments.count({

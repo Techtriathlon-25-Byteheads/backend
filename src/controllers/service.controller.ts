@@ -26,7 +26,12 @@ export const getServiceById = async (req: Request, res: Response) => {
 };
 
 export const createService = async (req: Request, res: Response) => {
-    const { serviceName, description, serviceCategory, processingTimeDays, feeAmount, requiredDocuments, eligibilityCriteria, onlineAvailable, appointmentRequired, maxCapacityPerSlot } = req.body;
+    const { serviceName, description, serviceCategory, processingTimeDays, feeAmount, requiredDocuments, eligibilityCriteria, onlineAvailable, appointmentRequired, maxCapacityPerSlot, operationalHours } = req.body;
+
+    if (operationalHours && (typeof operationalHours !== 'object' || Array.isArray(operationalHours))) {
+        return res.status(400).json({ message: 'operationalHours must be a valid JSON object.' });
+    }
+
     try {
         const newService = await prisma.dimServices.create({
             data: {
@@ -41,6 +46,7 @@ export const createService = async (req: Request, res: Response) => {
                 onlineAvailable,
                 appointmentRequired,
                 maxCapacityPerSlot,
+                operationalHours,
             },
         });
         res.status(201).json(newService);
@@ -52,7 +58,12 @@ export const createService = async (req: Request, res: Response) => {
 
 export const updateService = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { serviceName, description, serviceCategory, processingTimeDays, feeAmount, requiredDocuments, eligibilityCriteria, onlineAvailable, appointmentRequired, isActive, maxCapacityPerSlot } = req.body;
+    const { serviceName, description, serviceCategory, processingTimeDays, feeAmount, requiredDocuments, eligibilityCriteria, onlineAvailable, appointmentRequired, isActive, maxCapacityPerSlot, operationalHours } = req.body;
+
+    if (operationalHours && (typeof operationalHours !== 'object' || Array.isArray(operationalHours))) {
+        return res.status(400).json({ message: 'operationalHours must be a valid JSON object.' });
+    }
+
     try {
         const updatedService = await prisma.dimServices.update({
             where: { serviceId: id },
@@ -68,6 +79,7 @@ export const updateService = async (req: Request, res: Response) => {
                 appointmentRequired,
                 isActive,
                 maxCapacityPerSlot,
+                operationalHours,
             },
         });
         res.status(200).json(updatedService);
