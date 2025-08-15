@@ -12,6 +12,7 @@ import serviceRoutes from './routes/service.routes';
 import appointmentRoutes from './routes/appointment.routes';
 import userRoutes from './routes/user.routes';
 import uploadRoutes from './routes/upload.routes';
+import analyticsRoutes from './routes/analytics.routes';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -50,6 +51,7 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/user', userRoutes);
 
 app.use('/api/v1', uploadRoutes);
+app.use('/api/v1/analytics', analyticsRoutes);
 
 // File serving route (remains the same)
 app.get('/api/v1/files/:externalDocumentId', async (req, res) => {

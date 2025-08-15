@@ -1,9 +1,23 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
+import { DepartmentAddress } from '../types';
 
 export const getAllDepartments = async (req: Request, res: Response) => {
+    const { sortBy, order } = req.query;
+
     try {
-        const departments = await prisma.dimDepartments.findMany();
+        let orderBy = {};
+
+        if (sortBy === 'city') {
+            orderBy = {
+                headOfficeAddress: {
+                    path: ['city'],
+                    sort: order === 'desc' ? 'desc' : 'asc',
+                },
+            };
+        }
+
+        const departments = await prisma.dimDepartments.findMany({ orderBy });
         res.status(200).json(departments);
     } catch (error) {
         console.error(error);
@@ -26,14 +40,19 @@ export const getDepartmentById = async (req: Request, res: Response) => {
 };
 
 export const createDepartment = async (req: Request, res: Response) => {
-    const { departmentName, description, headOfficeAddress, contactInfo, operatingHours } = req.body;
+    const { departmentName, description, headOfficeAddress, contactInfo, operatingHours }: { headOfficeAddress: DepartmentAddress, [key: string]: any } = req.body;
+    
+    if (!headOfficeAddress || !headOfficeAddress.city || !headOfficeAddress.street) {
+        return res.status(400).json({ message: 'headOfficeAddress with city and street is required.' });
+    }
+
     try {
         const newDepartment = await prisma.dimDepartments.create({
             data: {
                 departmentId: `DEP${Date.now()}`,
                 departmentName,
                 description,
-                headOfficeAddress,
+                headOfficeAddress: headOfficeAddress as any, // Cast to any to satisfy Prisma's JsonValue type
                 contactInfo,
                 operatingHours,
             },
@@ -47,14 +66,14 @@ export const createDepartment = async (req: Request, res: Response) => {
 
 export const updateDepartment = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { departmentName, description, headOfficeAddress, contactInfo, operatingHours, isActive } = req.body;
+    const { departmentName, description, headOfficeAddress, contactInfo, operatingHours, isActive }: { headOfficeAddress?: DepartmentAddress, [key: string]: any } = req.body;
     try {
         const updatedDepartment = await prisma.dimDepartments.update({
             where: { departmentId: id },
             data: {
                 departmentName,
                 description,
-                headOfficeAddress,
+                headOfficeAddress: headOfficeAddress as any, // Cast to any to satisfy Prisma's JsonValue type
                 contactInfo,
                 operatingHours,
                 isActive,
