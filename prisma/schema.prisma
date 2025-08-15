@@ -270,7 +270,7 @@ model SubmittedDocument {
 model FactChatLogs {
   // Changed UnsignedBigInt to BigInt for PostgreSQL
   logId              BigInt           @id @default(autoincrement()) @map("log_id") @db.BigInt
-  userId             String           @map("user_id") @db.VarChar(10)
+  userId             String           @map("user_id") @db.VarChar(25)
   sessionId          String?          @map("session_id") @db.VarChar(36)
   messageType        ChatMessageType? @default(citizen) @map("message_type")
   message            String?          @db.Text
