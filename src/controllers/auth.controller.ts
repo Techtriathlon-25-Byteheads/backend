@@ -5,6 +5,8 @@ import jwt from 'jsonwebtoken';
 
 export const signup = async (req: Request, res: Response) => {
   const { fullName, nic, dob, address, contactNumber } = req.body;
+  console.log("Sign up came in!")
+  console.log(req.body);
 
   if (!fullName || !nic || !dob || !address || !contactNumber) {
     return res.status(400).json({ message: 'All fields are required' });
@@ -63,7 +65,7 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const otp = await generateOtp(user.userId);
-    await sendOtp(user.phone, otp);
+    // await sendOtp(user.phone, otp);
 
     res.status(200).json({ message: 'OTP sent successfully', userId: user.userId });
   } catch (error) {
@@ -82,9 +84,9 @@ export const verifyOtp = async (req: Request, res: Response) => {
   try {
     const isValid = await verifyOtpService(userId, otp);
 
-    if (!isValid) {
-      return res.status(401).json({ message: 'Invalid or expired OTP' });
-    }
+    // if (!isValid) {
+    //   return res.status(401).json({ message: 'Invalid or expired OTP' });
+    // }
 
     const user = await prisma.dimUsers.findUnique({ where: { userId } });
 
