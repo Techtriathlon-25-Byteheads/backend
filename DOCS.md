@@ -185,7 +185,7 @@ Get all departments. Can be sorted by city.
 * `sortBy` (string, optional): Field to sort by. Currently supports `city`.
 * `order` (string, optional): Sort order. Accepts `asc` (default) or `desc`.
 
-**Example:** `GET /api/v1/departments?sortBy=city&order=desc`
+**Example:** `GET /api/departments?sortBy=city&order=desc`
 
 **Success Response:**
 
@@ -323,16 +323,7 @@ Create a new service.
     "eligibilityCriteria": "Must be over 18 years old.",
     "onlineAvailable": true,
     "appointmentRequired": true,
-    "maxCapacityPerSlot": 10,
-    "operationalHours": {
-        "monday": ["09:00", "10:00", "11:00"],
-        "tuesday": [],
-        "wednesday": ["13:00", "14:00", "15:00"],
-        "thursday": ["09:00", "10:00", "11:00"],
-        "friday": ["09:00", "10:00"],
-        "saturday": [],
-        "sunday": []
-    }
+    "maxCapacityPerSlot": 10
 }
 ```
 
@@ -357,12 +348,7 @@ Update a service.
     "serviceName": "Driving License Renewal",
     "feeAmount": 500.00,
     "isActive": true,
-    "maxCapacityPerSlot": 8,
-    "operationalHours": {
-        "monday": ["09:00", "10:00", "11:00"],
-        "tuesday": [],
-        "wednesday": ["13:00", "14:00", "15:00"]
-    }
+    "maxCapacityPerSlot": 8
 }
 ```
 
@@ -391,7 +377,7 @@ Get all services for a specific department.
 
 ### `GET /appointments/:serviceId/slots`
 
-Get available appointment slots for a service on a specific date, based on the service's defined operational hours and current bookings.
+Get available appointment slots for a service on a specific date.
 
 **Authorization:** Public
 
@@ -440,7 +426,7 @@ Book a new appointment.
 
 Endpoints for the logged-in user.
 
-### `GET /api/v1/user/me`
+### `GET /api/user/me`
 
 Retrieves the profile of the currently logged-in user.
 
@@ -451,7 +437,7 @@ Retrieves the profile of the currently logged-in user.
 *   **Code:** `200 OK`
 *   **Content:** `User Object` (password hash is excluded)
 
-### `PUT /api/v1/user/me`
+### `PUT /api/user/me`
 
 Updates the profile of the currently logged-in user.
 
@@ -474,7 +460,7 @@ Updates the profile of the currently logged-in user.
 *   **Code:** `200 OK`
 *   **Content:** `The updated User object`
 
-### `GET /api/v1/user/appointments`
+### `GET /api/user/appointments`
 
 Get all appointments for the logged-in user.
 
@@ -485,7 +471,7 @@ Get all appointments for the logged-in user.
 *   **Code:** `200 OK`
 *   **Content:** `Array of Appointment objects`
 
-### `PUT /api/v1/user/appointments/:appointmentId/cancel`
+### `PUT /api/user/appointments/:appointmentId/cancel`
 
 Cancels an appointment owned by the logged-in user.
 
@@ -507,7 +493,7 @@ Cancels an appointment owned by the logged-in user.
 
 These endpoints allow Admins and Super Admins to manage appointments. For users with the `ADMIN` role, access is restricted to appointments for services they are assigned to. `SUPER_ADMIN` users have unrestricted access.
 
-#### `GET /api/v1/admin/appointments`
+#### `GET /api/admin/appointments`
 
 Get appointments. For Admins, this is scoped to their assigned services. For Super Admins, it returns all appointments.
 
@@ -518,7 +504,7 @@ Get appointments. For Admins, this is scoped to their assigned services. For Sup
 *   **Code:** `200 OK`
 *   **Content:** `Array of detailed Appointment objects`
 
-#### `POST /api/v1/admin/appointments`
+#### `POST /api/admin/appointments`
 
 Create a new appointment. Admins can only create appointments for services they are assigned to.
 
@@ -542,7 +528,7 @@ Create a new appointment. Admins can only create appointments for services they 
 *   **Code:** `201 Created`
 *   **Content:** `The created Appointment object`
 
-#### `PUT /api/v1/admin/appointments/:appointmentId`
+#### `PUT /api/admin/appointments/:appointmentId`
 
 Update the status or notes of an appointment. Admins can only update appointments for services they are assigned to.
 
@@ -562,7 +548,7 @@ Update the status or notes of an appointment. Admins can only update appointment
 *   **Code:** `200 OK`
 *   **Content:** `The updated Appointment object`
 
-#### `DELETE /api/v1/admin/appointments/:appointmentId`
+#### `DELETE /api/admin/appointments/:appointmentId`
 
 Deletes an appointment. Admins can only delete appointments for services they are assigned to.
 
@@ -579,7 +565,7 @@ Deletes an appointment. Admins can only delete appointments for services they ar
 
 These endpoints are used to manage Admin accounts and are restricted to users with the `SUPER_ADMIN` role.
 
-#### `GET /api/v1/admin/admins`
+#### `GET /api/admin/admins`
 
 Retrieves a list of all users with the `ADMIN` role and their assigned services.
 
@@ -590,7 +576,7 @@ Retrieves a list of all users with the `ADMIN` role and their assigned services.
 *   **Code:** `200 OK`
 *   **Content:** `Array of Admin User objects` (includes `assignedServices`)
 
-#### `POST /api/v1/admin/admins`
+#### `POST /api/admin/admins`
 
 Creates a new Admin user and optionally assigns them to services.
 
@@ -613,7 +599,7 @@ Creates a new Admin user and optionally assigns them to services.
 *   **Code:** `201 Created`
 *   **Content:** `The created Admin User object`
 
-#### `PUT /api/v1/admin/admins/:userId`
+#### `PUT /api/admin/admins/:userId`
 
 Updates an existing Admin user's details and service assignments.
 
@@ -638,7 +624,7 @@ Updates an existing Admin user's details and service assignments.
 *   **Code:** `200 OK`
 *   **Content:** `The updated Admin User object`
 
-#### `DELETE /api/v1/admin/admins/:userId`
+#### `DELETE /api/admin/admins/:userId`
 
 Deletes an Admin user.
 
@@ -653,7 +639,7 @@ Deletes an Admin user.
 
 ### User Management (Super Admin Only)
 
-#### `GET /api/v1/admin/users`
+#### `GET /api/admin/users`
 
 Retrieves a list of all users (all roles).
 
@@ -664,7 +650,7 @@ Retrieves a list of all users (all roles).
 *   **Code:** `200 OK`
 *   **Content:** `Array of User objects`
 
-#### `PUT /api/v1/admin/users/:userId`
+#### `PUT /api/admin/users/:userId`
 
 Updates any existing user's details, including their role.
 
@@ -694,7 +680,7 @@ Updates any existing user's details, including their role.
 
 ## Analytics
 
-### `GET /api/v1/analytics`
+### `GET /api/analytics`
 
 Retrieves a comprehensive set of analytics data for the platform.
 
@@ -789,7 +775,7 @@ Retrieves a comprehensive set of analytics data for the platform.
 
 File uploads are handled via a standard `multipart/form-data` endpoint. All uploaded files are encrypted at rest and can only be viewed via a public, unguessable link.
 
-### `POST /api/v1/upload`
+### `POST /api/upload`
 
 Uploads a single file to be associated with an appointment.
 
@@ -813,7 +799,7 @@ Uploads a single file to be associated with an appointment.
     }
     ```
 
-### `GET /api/v1/files/:externalDocumentId`
+### `GET /api/files/:externalDocumentId`
 
 Serves a decrypted file for viewing. This is a public endpoint.
 

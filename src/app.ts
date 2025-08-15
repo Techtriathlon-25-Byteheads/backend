@@ -48,13 +48,17 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/departments', departmentRoutes);
+app.use('/api/services', serviceRoutes);
+app.use('/api/appointments', appointmentRoutes);
 app.use('/api/user', userRoutes);
-
-app.use('/api/v1', uploadRoutes);
-app.use('/api/v1/analytics', analyticsRoutes);
+app.use('/api', uploadRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // File serving route (remains the same)
-app.get('/api/v1/files/:externalDocumentId', async (req, res) => {
+app.get('/api/files/:externalDocumentId', async (req, res) => {
     try {
         const { externalDocumentId } = req.params;
         const document = await prisma.submittedDocument.findUnique({
