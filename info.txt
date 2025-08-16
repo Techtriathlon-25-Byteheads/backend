@@ -1,3 +1,5 @@
+THIS IS THE PROPMT USED TO CREATE THE BASIC STRUCTURE OF THE APP.
+
 <TASK>
 Following is a app idea, tech stack, important info and db schema for a governmet  agency boocking app. 
 Your task is to implement the API/Backend for this application. 
