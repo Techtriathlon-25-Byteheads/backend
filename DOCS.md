@@ -323,7 +323,16 @@ Create a new service.
     "eligibilityCriteria": "Must be over 18 years old.",
     "onlineAvailable": true,
     "appointmentRequired": true,
-    "maxCapacityPerSlot": 10
+    "maxCapacityPerSlot": 10,
+    "operationalHours": {
+        "monday": ["09:00", "10:00", "11:00"],
+        "tuesday": [],
+        "wednesday": ["13:00", "14:00", "15:00"],
+        "thursday": ["09:00", "10:00", "11:00"],
+        "friday": ["09:00", "10:00"],
+        "saturday": [],
+        "sunday": []
+    }
 }
 ```
 
@@ -348,7 +357,12 @@ Update a service.
     "serviceName": "Driving License Renewal",
     "feeAmount": 500.00,
     "isActive": true,
-    "maxCapacityPerSlot": 8
+        "maxCapacityPerSlot": 8,
+    "operationalHours": {
+        "monday": ["09:00", "10:00", "11:00"],
+        "tuesday": [],
+        "wednesday": ["13:00", "14:00", "15:00"]
+    }
 }
 ```
 
@@ -678,6 +692,69 @@ Updates any existing user's details, including their role.
 
 ---
 
+## Feedback
+
+### `POST /api/feedback`
+
+Submits feedback for a completed appointment.
+
+**Authorization:** Authenticated User (Citizen)
+
+**Request Body:**
+
+```json
+{
+    "appointmentId": "APP1723532294023",
+    "rating": 5,
+    "remarks": "Excellent service!"
+}
+```
+
+**Success Response:**
+
+*   **Code:** `201 Created`
+*   **Content:** `The created Feedback object`
+
+### `GET /api/feedback`
+
+Retrieves feedback.
+- **Super Admins** get all feedback.
+- **Admins** get feedback for services they are assigned to.
+- **Citizens** get their own feedback.
+
+**Authorization:** Authenticated User (Admin, Super Admin, Citizen)
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `Array of Feedback objects`
+
+### `GET /api/feedback/stats`
+
+Retrieves feedback statistics.
+- **Super Admins** get stats for all feedback.
+- **Admins** get stats for services they are assigned to.
+
+**Authorization:** Authenticated User (Admin, Super Admin)
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:**
+    ```json
+    {
+        "totalFeedback": 1456,
+        "averageRating": 4.1,
+        "responseRate": 87.3,
+        "positiveFeedback": 61,
+        "positive": 892,
+        "neutral": 324,
+        "negative": 240
+    }
+    ```
+
+---
+
 ## Analytics
 
 ### `GET /api/analytics`
@@ -766,6 +843,98 @@ Retrieves a comprehensive set of analytics data for the platform.
     "remarks": "Document looks good.",
     "createdAt": "2025-08-13T12:05:00.000Z",
     "updatedAt": "2025-08-13T12:10:00.000Z"
+}
+```
+
+---
+
+## Real-time Queue System (WebSockets)
+
+The application uses WebSockets for real-time communication, primarily for managing and displaying appointment queues.
+
+### Connection
+
+Connect to the WebSocket server at the base URL (`http://localhost:3000`). The connection must be authenticated by providing a valid JWT token in the `auth` payload.
+
+```javascript
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:3000", {
+  auth: {
+    token: "<your_jwt_token>"
+  }
+});
+```
+
+### Emitting Events
+
+#### `join_service_queue`
+
+Joins the queue for a specific service to receive real-time updates.
+
+**Payload:** `serviceId` (string)
+
+**Example:**
+```javascript
+socket.emit('join_service_queue', 'SER1723532294023');
+```
+
+#### `book_appointment`
+
+Books a new appointment. This will also broadcast queue updates to all clients in the service queue and the admin dashboard.
+
+**Payload:** `AppointmentBookingData` (object)
+
+```json
+{
+  "departmentId": "DEP1723532294023",
+  "serviceId": "SER1723532294023",
+  "appointmentDate": "2025-12-25",
+  "appointmentTime": "10:00",
+  "notes": "I need this urgently."
+}
+```
+
+### Listening for Events
+
+#### `queue_update`
+
+Received when the number of people in a service queue changes.
+
+**Payload:**
+```json
+{
+  "serviceId": "SER1723532294023",
+  "queueCount": 15
+}
+```
+
+#### `appointment_booked`
+
+Received by the user who booked the appointment, confirming the booking.
+
+**Payload:** `Appointment Object`
+
+#### `admin_queue_update`
+
+Received by admins and super admins when a queue count changes.
+
+**Payload:**
+```json
+{
+  "serviceId": "SER1723532294023",
+  "queueCount": 15
+}
+```
+
+#### `error`
+
+Received when an error occurs.
+
+**Payload:**
+```json
+{
+  "message": "Error message here"
 }
 ```
 

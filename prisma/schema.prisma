@@ -257,6 +257,19 @@ model FactAppointments {
   @@index([appointmentType, appointmentDate], map: "idx_appointment_type")
   @@index([departmentId, appointmentDate, queueNumber], map: "idx_queue_management")
   @@index([reportId], map: "fk_appointments_report_idx")
+  feedback          Feedback?
+}
+
+model Feedback {
+  id              String           @id @default(cuid())
+  rating          Int
+  remarks         String?
+  appointment     FactAppointments @relation(fields: [appointmentId], references: [appointmentId])
+  appointmentId   String           @unique
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@map("feedback")
 }
 
 model SubmittedDocument {

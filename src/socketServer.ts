@@ -28,8 +28,12 @@ export const initializeSocketLogic = (io: Server) => {
       return next(new Error('Authentication error: Token not provided.'));
     }
 
+  console.log("JWT fron socket : ", token)
+
+
     jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret', (err: any, decoded: any) => {
       if (err) {
+        console.log("Authentication error: Invalid token")
         return next(new Error('Authentication error: Invalid token.'));
       }
       socket.user = decoded;

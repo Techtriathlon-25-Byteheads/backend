@@ -294,11 +294,33 @@ export const deleteAdmin = async (req: Request, res: Response) => {
 
 // --- User Management (Super Admin Only) ---
 
-export const getAllUsers = async (req: Request, res: Response) => {
+export const getAllUsers = async (req: AuthRequest, res: Response) => {
+    const admin = req.user!;
+
     try {
+        if (admin.role === 'SUPER_ADMIN') {
+            const users = await prisma.dimUsers.findMany({
+                select: { userId: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true },
+            });
+            return res.status(200).json(users);
+        }
+
+        const assignedServiceIds = await getAdminServiceIds(admin.userId);
+        if (assignedServiceIds.length === 0) {
+            return res.status(200).json([]);
+        }
+
         const users = await prisma.dimUsers.findMany({
+            where: {
+                appointments: {
+                    some: {
+                        serviceId: { in: assignedServiceIds },
+                    },
+                },
+            },
             select: { userId: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true },
         });
+
         res.status(200).json(users);
     } catch (error) {
         console.error("Error fetching all users:", error);
