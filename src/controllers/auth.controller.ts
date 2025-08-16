@@ -94,7 +94,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
     }
 
     const token = jwt.sign({ userId: user.userId, role: user.role }, process.env.JWT_SECRET || 'your_jwt_secret', { expiresIn: '1h' });
-
+    console.log("OTP from verify : ", token)
     res.status(200).json({ message: 'OTP verified successfully', token });
   } catch (error) {
     console.error(error);
