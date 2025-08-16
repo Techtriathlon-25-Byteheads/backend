@@ -97,7 +97,14 @@ Verifies the OTP and returns a JWT token.
     ```json
     {
       "message": "OTP verified successfully",
-      "token": "<jwt_token>"
+      "token": "<jwt_token>",
+      "user": {
+        "fullName": "John Doe",
+        "nic": "123456789V",
+        "dob": "1990-01-01T00:00:00.000Z",
+        "address": {"street": "123 Main St", "city": "Colombo"},
+        "contactNumber": "+94771234567"
+      }
     }
     ```
 
@@ -143,7 +150,7 @@ Get all departments.
 **Success Response:**
 
 *   **Code:** `200 OK`
-*   **Content:** `Array of Department objects` (See structure below)
+*   **Content:** `Array of Department objects` (each object includes a `services` array with `serviceId` and `serviceName`)
 
 ### `GET /departments/:id`
 
@@ -157,7 +164,7 @@ Get a department by ID.
 **Success Response:**
 
 *   **Code:** `200 OK`
-*   **Content:** `A single Department object`
+*   **Content:** `A single Department object` (includes a `services` array with `serviceId` and `serviceName`)
 
 ### `POST /departments`
 
@@ -255,7 +262,21 @@ Get all services.
 **Success Response:**
 
 *   **Code:** `200 OK`
-*   **Content:** `Array of Service objects` (See structure below)
+*   **Content:** `Array of Service objects` (each object includes a `departmentId` which is either the ID of the assigned department or `null`)
+
+### `GET /services/:id`
+
+Get a service by ID.
+
+**Authorization:** Public
+
+**Path Parameters:**
+* `id` (string, required): The ID of the service.
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `A single Service object` (includes a `departmentId` which is either the ID of the assigned department or `null`)
 
 ### `POST /services`
 
@@ -272,7 +293,13 @@ Create a new service.
     "serviceCategory": "licensing",
     "processingTimeDays": 14,
     "feeAmount": 1500.00,
-    "requiredDocuments": {"nic_copy": true, "birth_certificate": true},
+    "requiredDocuments": {
+        "usual": {
+            "National ID Copy": true,
+            "Birth Certificate": true
+        },
+        "other": ["Any other relevant documents", "Additional document"]
+    },
     "eligibilityCriteria": "Must be over 18 years old.",
     "onlineAvailable": true,
     "appointmentRequired": true,
@@ -485,6 +512,141 @@ Update the status of a submitted document.
 *   **Code:** `200 OK`
 *   **Content:** `The updated SubmittedDocument object`
 
+### Citizen Management (Super Admin Only)
+
+#### `GET /api/admin/citizens`
+
+Retrieves a list of all citizen users.
+
+**Authorization:** Super Admin
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `Array of Citizen User objects`
+
+#### `GET /api/admin/citizens/:id`
+
+Retrieves a single citizen user by their ID.
+
+**Authorization:** Super Admin
+
+**Path Parameters:**
+* `id` (string, required): The ID of the citizen user.
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `A single Citizen User object`
+
+#### `PUT /api/admin/citizens/:id`
+
+Updates a citizen's details.
+
+**Authorization:** Super Admin
+
+**Path Parameters:**
+* `id` (string, required): The ID of the citizen user to update.
+
+**Request Body:**
+
+```json
+{
+    "email": "citizen.user@example.com",
+    "firstName": "Citizen",
+    "lastName": "User",
+    "isActive": true
+}
+```
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `The updated Citizen User object`
+
+#### `GET /api/admin/citizens/:id/appointments`
+
+Retrieves all appointments for a specific citizen.
+
+**Authorization:** Super Admin
+
+**Path Parameters:**
+* `id` (string, required): The ID of the citizen user.
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `Array of Appointment objects` (fully populated with service, department, and document details)
+
+### Citizen Management (Super Admin Only)
+
+#### `GET /api/feedback`
+
+Retrieves feedback.
+- **Super Admins** get all feedback.
+- **Admins** get feedback for services they are assigned to.
+- **Citizens** get their own feedback.
+
+**Authorization:** Authenticated User (Admin, Super Admin, Citizen)
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `Array of Feedback objects` (each object includes `appointment.service.serviceId` and `appointment.service.serviceName`)
+
+#### `GET /api/admin/citizens/:id`
+
+Retrieves a single citizen user by their ID.
+
+**Authorization:** Super Admin
+
+**Path Parameters:**
+* `id` (string, required): The ID of the citizen user.
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `A single Citizen User object`
+
+#### `PUT /api/admin/citizens/:id`
+
+Updates a citizen's details.
+
+**Authorization:** Super Admin
+
+**Path Parameters:**
+* `id` (string, required): The ID of the citizen user to update.
+
+**Request Body:**
+
+```json
+{
+    "email": "citizen.user@example.com",
+    "firstName": "Citizen",
+    "lastName": "User",
+    "isActive": true
+}
+```
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `The updated Citizen User object`
+
+#### `GET /api/admin/citizens/:id/appointments`
+
+Retrieves all appointments for a specific citizen.
+
+**Authorization:** Super Admin
+
+**Path Parameters:**
+* `id` (string, required): The ID of the citizen user.
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `Array of Appointment objects` (fully populated with service, department, and document details)
+
 ---
 
 ## Object Structures
@@ -499,7 +661,13 @@ Update the status of a submitted document.
     "contactInfo": {"phone": "+94112233445"},
     "operatingHours": {"monday-friday": "9am-5pm"},
     "isActive": true,
-    "createdAt": "2025-08-13T10:00:00.000Z"
+    "createdAt": "2025-08-13T10:00:00.000Z",
+    "services": [
+        {
+            "serviceId": "SER1723532294023",
+            "serviceName": "New Driving License"
+        }
+    ]
 }
 ```
 
@@ -513,7 +681,8 @@ Update the status of a submitted document.
     "feeAmount": "1500.00",
     "isActive": true,
     "createdAt": "2025-08-13T10:00:00.000Z",
-    "updatedAt": "2025-08-13T10:00:00.000Z"
+    "updatedAt": "2025-08-13T10:00:00.000Z",
+    "departmentId": "DEP1723532294023"
 }
 ```
 

@@ -11,7 +11,11 @@ import {
     updateAdmin,
     deleteAdmin,
     getAllUsers,
-    updateUser
+    updateUser,
+    getAllCitizens,
+    getCitizenById,
+    updateCitizen,
+    getCitizenAppointments
 } from '../controllers/admin.controller';
 import { authenticateToken, authorizeRole } from '../middlewares/auth.middleware';
 
@@ -41,5 +45,11 @@ router.delete('/admins/:userId', authorizeRole(['SUPER_ADMIN']), deleteAdmin);
 
 router.get('/users', authorizeRole(['SUPER_ADMIN']), getAllUsers);
 router.put('/users/:userId', authorizeRole(['SUPER_ADMIN']), updateUser);
+
+// Citizen management routes (Super Admin only)
+router.get('/citizens', authorizeRole(['SUPER_ADMIN']), getAllCitizens);
+router.get('/citizens/:id', authorizeRole(['SUPER_ADMIN']), getCitizenById);
+router.put('/citizens/:id', authorizeRole(['SUPER_ADMIN']), updateCitizen);
+router.get('/citizens/:id/appointments', authorizeRole(['SUPER_ADMIN']), getCitizenAppointments);
 
 export default router;

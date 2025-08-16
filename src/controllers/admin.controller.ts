@@ -8,6 +8,8 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 export const login = async (req: AuthRequest, res: Response) => {
   const { email, password } = req.body;
 
+  console.log(req.body)
+
   if (!email || !password) {
     return res.status(400).json({ message: 'Email and password are required' });
   }
@@ -274,15 +276,20 @@ export const updateAdmin = async (req: Request, res: Response) => {
     }
 };
 
-export const deleteAdmin = async (req: Request, res: Response) => {
+export const deleteAdmin = async (req: AuthRequest, res: Response) => {
     const { userId } = req.params;
+    const loggedInAdminId = req.user!.userId;
+
+    if (userId === loggedInAdminId) {
+        return res.status(403).json({ message: 'You cannot delete your own account.' });
+    }
 
     try {
         // The schema is set to cascade delete assignments, so we only need to delete the user.
         await prisma.dimUsers.delete({
             where: { userId, role: 'ADMIN' },
         });
-        res.status(204).send();
+        res.status(200).json({ message: 'Admin deleted successfully' });
     } catch (error: any) {
         if (error.code === 'P2025') {
             return res.status(404).json({ message: 'Admin not found.' });
@@ -324,6 +331,110 @@ export const getAllUsers = async (req: AuthRequest, res: Response) => {
         res.status(200).json(users);
     } catch (error) {
         console.error("Error fetching all users:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export const getAllCitizens = async (req: Request, res: Response) => {
+    try {
+        const citizens = await prisma.dimUsers.findMany({
+            where: { role: 'CITIZEN' },
+            select: { 
+                userId: true, 
+                email: true, 
+                firstName: true, 
+                lastName: true, 
+                phone: true, 
+                nationalId: true, 
+                dateOfBirth: true, 
+                gender: true, 
+                address: true, 
+                preferredLanguage: true,
+                isVerified: true,
+                isActive: true,
+                createdAt: true
+            },
+        });
+        res.status(200).json(citizens);
+    } catch (error) {
+        console.error("Error fetching citizens:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export const getCitizenById = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        const citizen = await prisma.dimUsers.findUnique({
+            where: { userId: id, role: 'CITIZEN' },
+            select: { 
+                userId: true, 
+                email: true, 
+                firstName: true, 
+                lastName: true, 
+                phone: true, 
+                nationalId: true, 
+                dateOfBirth: true, 
+                gender: true, 
+                address: true, 
+                preferredLanguage: true,
+                isVerified: true,
+                isActive: true,
+                createdAt: true
+            },
+        });
+        if (!citizen) {
+            return res.status(404).json({ message: 'Citizen not found' });
+        }
+        res.status(200).json(citizen);
+    } catch (error) {
+        console.error("Error fetching citizen:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export const updateCitizen = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { email, firstName, lastName, phone, nationalId, dateOfBirth, gender, address, preferredLanguage, isVerified, isActive } = req.body;
+    try {
+        const updatedCitizen = await prisma.dimUsers.update({
+            where: { userId: id, role: 'CITIZEN' },
+            data: {
+                email,
+                firstName,
+                lastName,
+                phone,
+                nationalId,
+                dateOfBirth,
+                gender,
+                address,
+                preferredLanguage,
+                isVerified,
+                isActive,
+            },
+        });
+        res.status(200).json(updatedCitizen);
+    } catch (error) {
+        console.error("Error updating citizen:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export const getCitizenAppointments = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        const appointments = await prisma.factAppointments.findMany({
+            where: { userId: id },
+            include: {
+                service: true,
+                department: true,
+                submittedDocuments: true,
+            },
+            orderBy: { appointmentDate: 'desc' },
+        });
+        res.status(200).json(appointments);
+    } catch (error) {
+        console.error("Error fetching citizen appointments:", error);
         res.status(500).json({ message: "Internal server error" });
     }
 };

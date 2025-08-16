@@ -38,13 +38,13 @@ const getActiveServiceStats = async () => {
     const startOfLastMonth = startOfMonth(subMonths(now, 1));
 
     const thisMonthResult = await prisma.factAppointments.findMany({
-        where: { createdAt: { gte: startOfThisMonth } },
+        where: { createdAt: { gte: startOfThisMonth }, service: { isDeleted: false } },
         distinct: ['serviceId'],
         select: { serviceId: true },
     });
 
     const lastMonthResult = await prisma.factAppointments.findMany({
-        where: { createdAt: { gte: startOfLastMonth, lt: startOfThisMonth } },
+        where: { createdAt: { gte: startOfLastMonth, lt: startOfThisMonth }, service: { isDeleted: false } },
         distinct: ['serviceId'],
         select: { serviceId: true },
     });
@@ -114,7 +114,7 @@ const getDepartmentLoad = async () => {
 
     const departmentIds = result.map(item => item.departmentId);
     const departments = await prisma.dimDepartments.findMany({
-        where: { departmentId: { in: departmentIds } },
+        where: { departmentId: { in: departmentIds }, isDeleted: false },
         select: { departmentId: true, departmentName: true },
     });
 

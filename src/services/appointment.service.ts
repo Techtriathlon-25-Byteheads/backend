@@ -3,7 +3,6 @@ import { format } from 'date-fns';
 
 interface AppointmentData {
     userId: string;
-    departmentId: string;
     serviceId: string;
     appointmentDate: string;
     appointmentTime: string;
@@ -11,23 +10,38 @@ interface AppointmentData {
 }
 
 export const createAppointment = async (data: AppointmentData) => {
-    const { userId, departmentId, serviceId, appointmentDate, appointmentTime, notes } = data;
+    const { userId, serviceId, appointmentDate, appointmentTime, notes } = data;
 
     const service = await prisma.dimServices.findUnique({
         where: { serviceId },
-        select: { serviceId: true, maxCapacityPerSlot: true, operationalHours: true },
+        select: {
+            serviceId: true,
+            maxCapacityPerSlot: true,
+            operationalHours: true,
+            departments: {
+                select: {
+                    departmentId: true,
+                },
+            },
+        },
     });
+
     if (!service) {
         throw new Error('Service not found');
     }
 
+    const departmentId = service.departments.length > 0 ? service.departments[0].departmentId : undefined;
+
+    if (!departmentId) {
+        throw new Error('Service is not associated with any department.');
+    }
+
     const maxCapacity = service.maxCapacityPerSlot || 6;
 
-    const bookingDate = new Date(appointmentDate);
+    const bookingDate = new Date(appointmentDate + 'T00:00:00.000Z');
     const dayOfWeekName = format(bookingDate, 'EEEE').toLowerCase();
     const operationalHours = service.operationalHours as Record<string, string[]> | null;
 
-    // Validate against operational hours
     const validTimeSlots: string[] = operationalHours?.[dayOfWeekName] || [];
     if (!validTimeSlots.includes(appointmentTime)) {
         throw new Error('Service not operational on this day or time.');
@@ -51,11 +65,11 @@ export const createAppointment = async (data: AppointmentData) => {
         data: {
             appointmentId: `APP${Date.now()}`,
             userId,
-            departmentId,
             serviceId,
             appointmentDate: bookingDate,
             appointmentTime: bookingTime,
             notes,
+            departmentId: departmentId,
         },
     });
 

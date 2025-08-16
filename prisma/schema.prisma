@@ -117,6 +117,7 @@ model DimDepartments {
   contactInfo       Json?                  @map("contact_info")
   operatingHours    Json?                  @map("operating_hours")
   isActive          Boolean?               @default(true) @map("is_active")
+  isDeleted         Boolean?               @default(false) @map("is_deleted")
   createdAt         DateTime?              @default(now()) @map("created_at") @db.Timestamp(3)
   services          DimDepartmentService[]
   appointments      FactAppointments[]
@@ -137,6 +138,7 @@ model DimServices {
   onlineAvailable     Boolean?               @default(true) @map("online_available")
   appointmentRequired Boolean?               @default(false) @map("appointment_required")
   isActive            Boolean?               @default(true) @map("is_active")
+  isDeleted           Boolean?               @default(false) @map("is_deleted")
   maxCapacityPerSlot  Int?                   @default(6) @map("max_capacity_per_slot")
   createdAt           DateTime?              @default(now()) @map("created_at") @db.Timestamp(3)
   updatedAt           DateTime?              @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
@@ -281,7 +283,7 @@ model SubmittedDocument {
   mimeType           String
   originalFilename   String
   fileSizeBytes      Int
-  isApproved         Boolean?         @default(false)
+  isApproved         Boolean?
   remarks            String?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt

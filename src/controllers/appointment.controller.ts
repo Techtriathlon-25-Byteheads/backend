@@ -6,6 +6,14 @@ import { getDay, format } from 'date-fns';
 export const getServicesForDepartment = async (req: Request, res: Response) => {
     const { departmentId } = req.params;
     try {
+        const department = await prisma.dimDepartments.findUnique({
+            where: { departmentId, isDeleted: false },
+        });
+
+        if (!department) {
+            return res.status(404).json({ message: 'Department not found' });
+        }
+
         const services = await prisma.dimDepartmentService.findMany({
             where: { departmentId },
             include: { service: true },
@@ -25,7 +33,7 @@ export const getAvailableSlots = async (req: Request, res: Response) => {
         return res.status(400).json({ message: 'Date is required' });
     }
 
-    const bookingDate = new Date(date as string);
+    const bookingDate = new Date((date as string) + 'T00:00:00.000Z');
     const dayOfWeekName = format(bookingDate, 'EEEE').toLowerCase(); // e.g., 'monday'
 
     try {
@@ -45,7 +53,7 @@ export const getAvailableSlots = async (req: Request, res: Response) => {
         const validTimeSlots: string[] = operationalHours?.[dayOfWeekName] || [];
 
         if (validTimeSlots.length === 0) {
-            return res.status(200).json({ slots: [] }); // Service not operational on this day
+            return res.status(200).json([]); // Service not operational on this day
         }
 
         const appointments = await prisma.factAppointments.groupBy({
@@ -62,7 +70,7 @@ export const getAvailableSlots = async (req: Request, res: Response) => {
         const slots = validTimeSlots.map(slot => {
             const appointmentCount = appointments.find(a => {
                 // Convert stored appointmentTime (Date object) to HH:MM string for comparison
-                const storedTime = a.appointmentTime ? format(new Date(a.appointmentTime), 'HH:mm') : null;
+                const storedTime = a.appointmentTime ? new Date(a.appointmentTime).toISOString().slice(11, 16) : null;
                 return storedTime === slot;
             });
             const currentQueueSize = appointmentCount ? appointmentCount._count.appointmentId : 0;
@@ -74,7 +82,7 @@ export const getAvailableSlots = async (req: Request, res: Response) => {
             };
         });
 
-        res.status(200).json({ slots });
+        res.status(200).json(slots);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error' });
@@ -84,13 +92,12 @@ export const getAvailableSlots = async (req: Request, res: Response) => {
 import { createAppointment } from '../services/appointment.service';
 
 export const bookAppointment = async (req: AuthRequest, res: Response) => {
-    const { departmentId, serviceId, appointmentDate, appointmentTime, notes } = req.body;
+    const { serviceId, appointmentDate, appointmentTime, notes } = req.body;
     const userId = req.user!.userId;
 
     try {
         const newAppointment = await createAppointment({
             userId,
-            departmentId,
             serviceId,
             appointmentDate,
             appointmentTime,

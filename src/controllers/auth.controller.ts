@@ -45,7 +45,7 @@ export const signup = async (req: Request, res: Response) => {
 
 export const login = async (req: Request, res: Response) => {
   const { nic, phone } = req.body;
-
+console.log(req.body);
   if (!nic || !phone) {
     return res.status(400).json({ message: 'NIC and phone number are required' });
   }
@@ -94,10 +94,36 @@ export const verifyOtp = async (req: Request, res: Response) => {
     }
 
     const token = jwt.sign({ userId: user.userId, role: user.role }, process.env.JWT_SECRET || 'your_jwt_secret', { expiresIn: '1h' });
-    console.log("OTP from verify : ", token)
-    res.status(200).json({ message: 'OTP verified successfully', token });
+
+    res.status(200).json({ 
+      message: 'OTP verified successfully', 
+      token, 
+      user: {
+        fullName: `${user.firstName} ${user.lastName}`,
+        nic: user.nationalId,
+        dob: user.dateOfBirth,
+        address: user.address,
+        contactNumber: user.phone
+      }
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Internal server error' });
   }
+};
+
+export const validateToken = (req: Request, res: Response) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(400).json({ message: 'Token not provided' });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret', (err: any, user: any) => {
+        if (err) {
+            return res.status(401).json({ message: 'Invalid or expired token' });
+        }
+        res.status(200).json({ message: 'Token is valid' });
+    });
 };
