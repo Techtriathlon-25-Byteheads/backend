@@ -35,7 +35,7 @@ export const signup = async (req: Request, res: Response) => {
     });
 
     const otp = await generateOtp(user.userId);
-    // await sendOtp(contactNumber, otp); 
+    await sendOtp(contactNumber, otp); 
     res.status(201).json({ message: 'User created successfully. Please verify OTP.', userId: user.userId });
   } catch (error) {
     console.error(error);
@@ -64,7 +64,7 @@ console.log(req.body);
     }
 
     const otp = await generateOtp(user.userId);
-    // await sendOtp(user.phone, otp);
+    await sendOtp(user.phone, otp);
 
     res.status(200).json({ message: 'OTP sent successfully', userId: user.userId });
   } catch (error) {
@@ -83,9 +83,9 @@ export const verifyOtp = async (req: Request, res: Response) => {
   try {
     const isValid = await verifyOtpService(userId, otp);
 
-    // if (!isValid) {
-    //   return res.status(401).json({ message: 'Invalid or expired OTP' });
-    // }
+    if (!isValid) {
+      return res.status(401).json({ message: 'Invalid or expired OTP' });
+    }
 
     const user = await prisma.dimUsers.findUnique({ where: { userId } });
 
