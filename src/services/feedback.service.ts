@@ -40,8 +40,21 @@ export class FeedbackService {
   }
 
   public async getFeedbacks(user: { role: string; userId: string }) {
+    const includeService = {
+      appointment: {
+        include: {
+          service: {
+            select: {
+              serviceId: true,
+              serviceName: true,
+            },
+          },
+        },
+      },
+    };
+
     if (user.role === 'SUPER_ADMIN') {
-      return prisma.feedback.findMany();
+      return prisma.feedback.findMany({ include: includeService });
     } else if (user.role === 'ADMIN') {
       const adminServices = await prisma.adminServiceAssignment.findMany({
         where: { adminId: user.userId },
@@ -58,6 +71,7 @@ export class FeedbackService {
             },
           },
         },
+        include: includeService,
       });
     } else {
         return []

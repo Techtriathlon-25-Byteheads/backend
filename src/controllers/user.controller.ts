@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { AppointmentStatus } from '@prisma/client';
 
 export const getMyProfile = async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
@@ -56,10 +57,23 @@ export const updateMyProfile = async (req: AuthRequest, res: Response) => {
 
 export const getUserAppointments = async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
+    const { status } = req.query; // Get status from query parameter
+
     try {
+        let whereClause: any = { userId };
+
+        if (status) {
+            // Validate status against the enum
+            const validStatuses = Object.values(AppointmentStatus);
+            if (!validStatuses.includes(status as AppointmentStatus)) {
+                return res.status(400).json({ message: 'Invalid appointment status provided.' });
+            }
+            whereClause.status = status as AppointmentStatus;
+        }
+
         const appointments = await prisma.factAppointments.findMany({
-            where: { userId },
-            include: { service: true, department: true },
+            where: whereClause,
+            include: { service: true, department: true, submittedDocuments: true },
             orderBy: { appointmentDate: 'desc' },
         });
         res.status(200).json(appointments);

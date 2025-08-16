@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import prisma from './config/prisma';
 import { createAppointment } from './services/appointment.service';
+import { format } from 'date-fns';
 
 // Define a custom interface for Sockets that includes user information
 interface SocketWithUser extends Socket {
@@ -12,12 +13,59 @@ interface SocketWithUser extends Socket {
 }
 
 interface AppointmentBookingData {
-  departmentId: string;
   serviceId: string;
   appointmentDate: string; // YYYY-MM-DD
   appointmentTime: string; // HH:MM
   notes?: string;
 }
+
+const getServiceSlotsData = async (serviceId: string, date: Date) => {
+    const dayOfWeekName = format(date, 'EEEE').toLowerCase();
+
+    const service = await prisma.dimServices.findUnique({
+        where: { serviceId },
+        select: { serviceId: true, maxCapacityPerSlot: true, operationalHours: true },
+    });
+
+    if (!service) {
+        return null; // Service not found
+    }
+
+    const maxCapacity = service.maxCapacityPerSlot || 6;
+    const operationalHours = service.operationalHours as Record<string, string[]> | null;
+    const validTimeSlots: string[] = operationalHours?.[dayOfWeekName] || [];
+
+    if (validTimeSlots.length === 0) {
+        return []; // Service not operational on this day
+    }
+
+    const appointments = await prisma.factAppointments.groupBy({
+        by: ['appointmentTime'],
+        where: {
+            serviceId,
+            appointmentDate: date,
+        },
+        _count: {
+            appointmentId: true,
+        },
+    });
+
+    const slots = validTimeSlots.map(slot => {
+        const appointmentCount = appointments.find(a => {
+            const storedTime = a.appointmentTime ? format(new Date(a.appointmentTime), 'HH:mm') : null;
+            return storedTime === slot;
+        });
+        const currentQueueSize = appointmentCount ? appointmentCount._count.appointmentId : 0;
+        return {
+            time: slot,
+            currentQueueSize,
+            maxCapacity,
+            isAvailable: currentQueueSize < maxCapacity,
+        };
+    });
+
+    return slots;
+};
 
 export const initializeSocketLogic = (io: Server) => {
   // Socket.IO middleware for authentication
@@ -55,14 +103,9 @@ export const initializeSocketLogic = (io: Server) => {
         const roomName = `service-${serviceId}`;
         socket.join(roomName);
 
-        const queueCount = await prisma.factAppointments.count({
-          where: {
-            serviceId: serviceId,
-            status: { in: ['scheduled', 'confirmed'] },
-          },
-        });
+        const slots = await getServiceSlotsData(serviceId, new Date());
 
-        socket.emit('queue_update', { serviceId, queueCount });
+        socket.emit('queue_update', { serviceId, slots });
       } catch (error) {
         console.error(`Error joining service queue for service ${serviceId}:`, error);
         socket.emit('error', { message: 'Could not join service queue.' });
@@ -82,19 +125,14 @@ export const initializeSocketLogic = (io: Server) => {
         socket.emit('appointment_booked', newAppointment);
 
         // Calculate the new queue count
-        const queueCount = await prisma.factAppointments.count({
-          where: {
-            serviceId: serviceId,
-            status: { in: ['scheduled', 'confirmed'] },
-          },
-        });
+        const slots = await getServiceSlotsData(serviceId, new Date(data.appointmentDate));
 
         // Broadcast the updated queue count to the service room
         const roomName = `service-${serviceId}`;
-        io.to(roomName).emit('queue_update', { serviceId, queueCount });
+        io.to(roomName).emit('queue_update', { serviceId, slots });
 
         // Broadcast the update to the admin dashboard
-        io.to('admin_dashboard').emit('admin_queue_update', { serviceId, queueCount });
+        io.to('admin_dashboard').emit('admin_queue_update', { serviceId, slots });
 
       } catch (error: any) {
         console.error(`Appointment booking failed for user ${socket.user.userId}:`, error);

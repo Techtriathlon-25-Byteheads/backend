@@ -138,9 +138,43 @@ Verifies the OTP and returns a JWT token.
     ```json
     {
       "message": "OTP verified successfully",
-      "token": "<jwt_token>"
+      "token": "<jwt_token>",
+      "user": {
+        "fullName": "John Doe",
+        "nic": "123456789V",
+        "dob": "1990-01-01T00:00:00.000Z",
+        "address": {"street": "123 Main St", "city": "Colombo"},
+        "contactNumber": "+94771234567"
+      }
     }
     ```
+
+### `GET /auth/validate`
+
+Validates a JWT token. This is a public endpoint that allows any client to check the validity and expiration of a given token.
+
+**Authorization:** Public
+
+**Request Headers:**
+*   `Authorization: Bearer <your_jwt_token>` (required)
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:**
+    ```json
+    {
+      "message": "Token is valid"
+    }
+    ```
+
+**Error Responses:**
+
+*   **Code:** `400 Bad Request`
+*   **Content:** `{ "message": "Token not provided" }`
+
+*   **Code:** `401 Unauthorized`
+*   **Content:** `{ "message": "Invalid or expired token" }`
 
 ---
 
@@ -190,7 +224,7 @@ Get all departments. Can be sorted by city.
 **Success Response:**
 
 *   **Code:** `200 OK`
-*   **Content:** `Array of Department objects`
+*   **Content:** `Array of Department objects` (each object includes a `services` array with `serviceId` and `serviceName`)
 
 ### `GET /departments/:id`
 
@@ -204,7 +238,7 @@ Get a department by ID.
 **Success Response:**
 
 *   **Code:** `200 OK`
-*   **Content:** `A single Department object`
+*   **Content:** `A single Department object` (includes a `services` array with `serviceId` and `serviceName`)
 
 ### `POST /departments`
 
@@ -302,7 +336,21 @@ Get all services.
 **Success Response:**
 
 *   **Code:** `200 OK`
-*   **Content:** `Array of Service objects`
+*   **Content:** `Array of Service objects` (each object includes a `departmentId` which is either the ID of the assigned department or `null`)
+
+### `GET /services/:id`
+
+Get a service by ID.
+
+**Authorization:** Public
+
+**Path Parameters:**
+* `id` (string, required): The ID of the service.
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `A single Service object` (includes a `departmentId` which is either the ID of the assigned department or `null`)
 
 ### `POST /services`
 
@@ -319,7 +367,21 @@ Create a new service.
     "serviceCategory": "licensing",
     "processingTimeDays": 14,
     "feeAmount": 1500.00,
-    "requiredDocuments": {"nic_copy": true, "birth_certificate": true},
+    "requiredDocuments": {
+        "usual": {
+            "National ID Copy": true,
+            "Birth Certificate": false,
+            "Passport Copy": true,
+            "Marriage Certificate": false,
+            "Medical Certificate": true,
+            "Educational Certificates": false,
+            "Employment Letter": true,
+            "Bank Statements": false,
+            "Utility Bills": true,
+            "Police Clearance": false
+        },
+        "other": ["Any other relevant documents", "Additional document"]
+    },
     "eligibilityCriteria": "Must be over 18 years old.",
     "onlineAvailable": true,
     "appointmentRequired": true,
@@ -476,9 +538,14 @@ Updates the profile of the currently logged-in user.
 
 ### `GET /api/user/appointments`
 
-Get all appointments for the logged-in user.
+Get all appointments for the logged-in user. Can be filtered by appointment status.
 
 **Authorization:** Authenticated User
+
+**Query Parameters:**
+* `status` (string, optional): Filter appointments by status. Accepts values from `AppointmentStatus` enum (e.g., `scheduled`, `completed`, `cancelled`).
+
+**Example:** `GET /api/user/appointments?status=scheduled`
 
 **Success Response:**
 
@@ -509,7 +576,7 @@ These endpoints allow Admins and Super Admins to manage appointments. For users 
 
 #### `GET /api/admin/appointments`
 
-Get appointments. For Admins, this is scoped to their assigned services. For Super Admins, it returns all appointments.
+Get appointments. For Admins, this is scoped to their assigned services. For Super Admins, it returns all appointments. The response includes the user, service, and submitted documents for each appointment.
 
 **Authorization:** Admin, Super Admin
 
@@ -517,6 +584,43 @@ Get appointments. For Admins, this is scoped to their assigned services. For Sup
 
 *   **Code:** `200 OK`
 *   **Content:** `Array of detailed Appointment objects`
+
+**Example Response Body:**
+```json
+[
+    {
+        "appointmentId": "APP1723532294023",
+        "userId": "USR1723532294023",
+        "departmentId": "DEP1723532294023",
+        "serviceId": "SER1723532294023",
+        "appointmentDate": "2025-12-25T00:00:00.000Z",
+        "appointmentTime": "1970-01-01T10:00:00.000Z",
+        "status": "scheduled",
+        "notes": "I need this urgently.",
+        "createdAt": "2025-08-13T12:00:00.000Z",
+        "updatedAt": "2025-08-13T12:00:00.000Z",
+        "user": {
+            "userId": "USR1723532294023",
+            "firstName": "John",
+            "lastName": "Doe",
+            "email": "john.doe@example.com"
+        },
+        "service": {
+            "serviceId": "SER1723532294023",
+            "serviceName": "New Driving License"
+        },
+        "submittedDocuments": [
+            {
+                "documentId": "clv2...",
+                "externalDocumentId": "<uuid>",
+                "originalFilename": "mydocument.pdf",
+                "isApproved": true,
+                "remarks": "Document looks good."
+            }
+        ]
+    }
+]
+```
 
 #### `POST /api/admin/appointments`
 
@@ -690,6 +794,72 @@ Updates any existing user's details, including their role.
 *   **Code:** `200 OK`
 *   **Content:** `The updated User object`
 
+### Citizen Management (Super Admin Only)
+
+#### `GET /api/admin/citizens`
+
+Retrieves a list of all citizen users.
+
+**Authorization:** Super Admin
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `Array of Citizen User objects`
+
+#### `GET /api/admin/citizens/:id`
+
+Retrieves a single citizen user by their ID.
+
+**Authorization:** Super Admin
+
+**Path Parameters:**
+* `id` (string, required): The ID of the citizen user.
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `A single Citizen User object`
+
+#### `PUT /api/admin/citizens/:id`
+
+Updates a citizen's details.
+
+**Authorization:** Super Admin
+
+**Path Parameters:**
+* `id` (string, required): The ID of the citizen user to update.
+
+**Request Body:**
+
+```json
+{
+    "email": "citizen.user@example.com",
+    "firstName": "Citizen",
+    "lastName": "User",
+    "isActive": true
+}
+```
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `The updated Citizen User object`
+
+#### `GET /api/admin/citizens/:id/appointments`
+
+Retrieves all appointments for a specific citizen.
+
+**Authorization:** Super Admin
+
+**Path Parameters:**
+* `id` (string, required): The ID of the citizen user.
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `Array of Appointment objects` (fully populated with service, department, and document details)
+
 ---
 
 ## Feedback
@@ -727,7 +897,7 @@ Retrieves feedback.
 **Success Response:**
 
 *   **Code:** `200 OK`
-*   **Content:** `Array of Feedback objects`
+*   **Content:** `Array of Feedback objects` (each object includes `appointment.service.serviceId` and `appointment.service.serviceName`)
 
 ### `GET /api/feedback/stats`
 
@@ -795,7 +965,13 @@ Retrieves a comprehensive set of analytics data for the platform.
     "contactInfo": {"phone": "+94112233445"},
     "operatingHours": {"monday-friday": "9am-5pm"},
     "isActive": true,
-    "createdAt": "2025-08-13T10:00:00.000Z"
+    "createdAt": "2025-08-13T10:00:00.000Z",
+    "services": [
+        {
+            "serviceId": "SER1723532294023",
+            "serviceName": "New Driving License"
+        }
+    ]
 }
 ```
 
@@ -809,7 +985,8 @@ Retrieves a comprehensive set of analytics data for the platform.
     "feeAmount": "1500.00",
     "isActive": true,
     "createdAt": "2025-08-13T10:00:00.000Z",
-    "updatedAt": "2025-08-13T10:00:00.000Z"
+    "updatedAt": "2025-08-13T10:00:00.000Z",
+    "departmentId": "DEP1723532294023"
 }
 ```
 
@@ -905,7 +1082,10 @@ Received when the number of people in a service queue changes.
 ```json
 {
   "serviceId": "SER1723532294023",
-  "queueCount": 15
+  "slots": [
+    { "time": "09:00", "currentQueueSize": 5, "maxCapacity": 10, "isAvailable": true },
+    { "time": "10:00", "currentQueueSize": 10, "maxCapacity": 10, "isAvailable": false }
+  ]
 }
 ```
 
@@ -923,7 +1103,10 @@ Received by admins and super admins when a queue count changes.
 ```json
 {
   "serviceId": "SER1723532294023",
-  "queueCount": 15
+  "slots": [
+    { "time": "09:00", "currentQueueSize": 5, "maxCapacity": 10, "isAvailable": true },
+    { "time": "10:00", "currentQueueSize": 10, "maxCapacity": 10, "isAvailable": false }
+  ]
 }
 ```
 

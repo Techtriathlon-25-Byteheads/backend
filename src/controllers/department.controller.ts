@@ -17,8 +17,31 @@ export const getAllDepartments = async (req: Request, res: Response) => {
             };
         }
 
-        const departments = await prisma.dimDepartments.findMany({ orderBy });
-        res.status(200).json(departments);
+        const departments = await prisma.dimDepartments.findMany({
+            where: { isDeleted: false },
+            include: {
+                services: {
+                    include: {
+                        service: {
+                            select: {
+                                serviceId: true,
+                                serviceName: true
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy
+        });
+
+        const formattedDepartments = departments.map(department => {
+            return {
+                ...department,
+                services: department.services.map(service => service.service)
+            }
+        });
+
+        res.status(200).json(formattedDepartments);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error' });
@@ -28,11 +51,31 @@ export const getAllDepartments = async (req: Request, res: Response) => {
 export const getDepartmentById = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
-        const department = await prisma.dimDepartments.findUnique({ where: { departmentId: id } });
+        const department = await prisma.dimDepartments.findUnique({
+            where: { departmentId: id, isDeleted: false },
+            include: {
+                services: {
+                    include: {
+                        service: {
+                            select: {
+                                serviceId: true,
+                                serviceName: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
         if (!department) {
             return res.status(404).json({ message: 'Department not found' });
         }
-        res.status(200).json(department);
+
+        const formattedDepartment = {
+            ...department,
+            services: department.services.map(service => service.service)
+        }
+
+        res.status(200).json(formattedDepartment);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error' });
@@ -89,8 +132,11 @@ export const updateDepartment = async (req: Request, res: Response) => {
 export const deleteDepartment = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
-        await prisma.dimDepartments.delete({ where: { departmentId: id } });
-        res.status(204).send();
+        await prisma.dimDepartments.update({
+            where: { departmentId: id },
+            data: { isDeleted: true, isActive: false },
+        });
+        res.status(200).json({ message: 'Department deleted successfully' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error' });
