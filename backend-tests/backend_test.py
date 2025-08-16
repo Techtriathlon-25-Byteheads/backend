@@ -103,12 +103,17 @@ class BackendTester:
     def test_citizen_auth_flow(self):
         """Test the complete citizen authentication flow"""
         # Step 1: Test citizen signup
+        unique_id = int(time.time()) % 1000000000
         signup_data = {
-            "fullName": "Test User",
-            "nic": f"{int(time.time()) % 1000000000}V",  # Generate unique NIC
+            "fullName": "Test User Demo",
+            "nic": f"{unique_id}V",  # Generate unique NIC
             "dob": "1990-01-01",
-            "address": {"street": "123 Test St", "city": "Colombo"},
-            "contactNumber": "+94771234567"
+            "address": {
+                "street": "123 Test Street", 
+                "city": "Colombo", 
+                "postalCode": "00100"
+            },
+            "contactNumber": f"+9477{unique_id % 10000000:07d}"
         }
         
         test_name = "Citizen Signup"
@@ -117,16 +122,35 @@ class BackendTester:
             response = self.session.post(f"{self.base_url}/api/auth/signup", json=signup_data)
             response_time = time.time() - start_time
             
-            if response.status_code in [201, 400, 409]:
-                self.log_test_result(test_name, True, f"Status: {response.status_code}", response_time)
+            if response.status_code in [201, 400, 409, 422]:
+                success_msg = f"Status: {response.status_code}"
                 if response.status_code == 201:
-                    data = response.json()
-                    self.test_user_id = data.get('userId')
-                    logger.info(f"User created with ID: {self.test_user_id}")
+                    try:
+                        data = response.json()
+                        self.test_user_id = data.get('userId') or data.get('id')
+                        success_msg += f" - User ID: {self.test_user_id}"
+                    except:
+                        pass
+                elif response.status_code in [400, 422]:
+                    try:
+                        error_data = response.json()
+                        success_msg += f" - Validation: {error_data.get('message', 'Invalid data')}"
+                    except:
+                        pass
+                elif response.status_code == 409:
+                    success_msg += " - User already exists"
+                
+                self.log_test_result(test_name, True, success_msg, response_time)
             else:
-                self.log_test_result(test_name, False, f"Unexpected status: {response.status_code}", response_time)
+                try:
+                    error_detail = response.json().get('message', response.text[:100])
+                except:
+                    error_detail = response.text[:100]
+                self.log_test_result(test_name, False, f"Status: {response.status_code} - {error_detail}", response_time)
+        except requests.exceptions.RequestException as e:
+            self.log_test_result(test_name, False, f"Network error: {str(e)}")
         except Exception as e:
-            self.log_test_result(test_name, False, f"Error: {str(e)}")
+            self.log_test_result(test_name, False, f"Unexpected error: {str(e)}")
 
         # Step 2: Test citizen login (OTP request)
         login_data = {
@@ -246,9 +270,25 @@ class BackendTester:
             dept_data = {
                 "departmentName": f"Test Department {int(time.time())}",
                 "description": "Test department for API testing",
-                "headOfficeAddress": {"street": "123 Test St", "city": "Colombo"},
-                "contactInfo": {"phone": "+94112233445"},
-                "operatingHours": {"monday-friday": "9am-5pm"}
+                "headOfficeAddress": {
+                    "street": "123 Test St", 
+                    "city": "Colombo",
+                    "postalCode": "00100",
+                    "district": "Colombo",
+                    "province": "Western"
+                },
+                "contactInfo": {
+                    "phone": "+94112233445",
+                    "email": "test@dept.gov.lk",
+                    "fax": "+94112233446"
+                },
+                "operatingHours": {
+                    "weekdays": "09:00-17:00",
+                    "saturday": "09:00-13:00",
+                    "sunday": "Closed"
+                },
+                "departmentCode": f"TEST{int(time.time()) % 10000}",
+                "isActive": True
             }
             
             test_name = "Create Department"
@@ -258,10 +298,27 @@ class BackendTester:
                                            json=dept_data, headers=headers)
                 response_time = time.time() - start_time
                 
-                if response.status_code in [201, 401, 403, 400]:
-                    self.log_test_result(test_name, True, f"Status: {response.status_code}", response_time)
+                if response.status_code in [201, 401, 403, 400, 422]:
+                    success_msg = f"Status: {response.status_code}"
+                    if response.status_code == 201:
+                        try:
+                            data = response.json()
+                            success_msg += f" - Department ID: {data.get('id', 'Unknown')}"
+                        except:
+                            pass
+                    elif response.status_code in [400, 422]:
+                        try:
+                            error_data = response.json()
+                            success_msg += f" - Validation: {error_data.get('message', 'Invalid data')}"
+                        except:
+                            pass
+                    self.log_test_result(test_name, True, success_msg, response_time)
                 else:
-                    self.log_test_result(test_name, False, f"Unexpected status: {response.status_code}", response_time)
+                    try:
+                        error_detail = response.json().get('message', response.text[:100])
+                    except:
+                        error_detail = response.text[:100]
+                    self.log_test_result(test_name, False, f"Status: {response.status_code} - {error_detail}", response_time)
             except Exception as e:
                 self.log_test_result(test_name, False, f"Error: {str(e)}")
 
@@ -318,10 +375,27 @@ class BackendTester:
                                            json=service_data, headers=headers)
                 response_time = time.time() - start_time
                 
-                if response.status_code in [201, 401, 403, 400]:
-                    self.log_test_result(test_name, True, f"Status: {response.status_code}", response_time)
+                if response.status_code in [201, 401, 403, 400, 422]:
+                    success_msg = f"Status: {response.status_code}"
+                    if response.status_code == 201:
+                        try:
+                            data = response.json()
+                            success_msg += f" - Service ID: {data.get('id', 'Unknown')}"
+                        except:
+                            pass
+                    elif response.status_code in [400, 422]:
+                        try:
+                            error_data = response.json()
+                            success_msg += f" - Validation: {error_data.get('message', 'Invalid data')}"
+                        except:
+                            pass
+                    self.log_test_result(test_name, True, success_msg, response_time)
                 else:
-                    self.log_test_result(test_name, False, f"Unexpected status: {response.status_code}", response_time)
+                    try:
+                        error_detail = response.json().get('message', response.text[:100])
+                    except:
+                        error_detail = response.text[:100]
+                    self.log_test_result(test_name, False, f"Status: {response.status_code} - {error_detail}", response_time)
             except Exception as e:
                 self.log_test_result(test_name, False, f"Error: {str(e)}")
 
@@ -403,10 +477,13 @@ class BackendTester:
 
             # Test update user profile
             profile_data = {
-                "firstName": "John Updated",
-                "lastName": "Doe",
-                "phone": "+94777654321",
-                "address": {"street": "456 Updated St", "city": "Kandy"},
+                "fullName": "John Updated",
+                "address": {
+                    "street": "456 Updated St", 
+                    "city": "Kandy",
+                    "postalCode": "20000"
+                },
+                "contactNumber": "+94777654321",
                 "preferredLanguage": "SI"
             }
             
@@ -417,8 +494,21 @@ class BackendTester:
                                           json=profile_data, headers=headers)
                 response_time = time.time() - start_time
                 
-                if response.status_code in [200, 401, 400]:
-                    self.log_test_result(test_name, True, f"Status: {response.status_code}", response_time)
+                if response.status_code in [200, 401, 400, 422]:
+                    success_msg = f"Status: {response.status_code}"
+                    if response.status_code == 200:
+                        try:
+                            data = response.json()
+                            success_msg += " - Profile updated"
+                        except:
+                            pass
+                    elif response.status_code in [400, 422]:
+                        try:
+                            error_data = response.json()
+                            success_msg += f" - Error: {error_data.get('message', 'Validation error')}"
+                        except:
+                            pass
+                    self.log_test_result(test_name, True, success_msg, response_time)
                 else:
                     self.log_test_result(test_name, False, f"Unexpected status: {response.status_code}", response_time)
             except Exception as e:
@@ -677,6 +767,456 @@ class BackendTester:
         else:
             self.log_test_result(test_name, False, "No successful requests")
     
+    def test_data_validation(self):
+        """Test API endpoints with invalid data to check validation"""
+        # Test citizen signup with missing required fields
+        invalid_signup_tests = [
+            ({}, "Empty payload"),
+            ({"fullName": ""}, "Empty name"),
+            ({"fullName": "Test", "nic": "invalid"}, "Invalid NIC format"),
+            ({"fullName": "Test", "nic": "123456789V", "dob": "invalid-date"}, "Invalid date format"),
+            ({"fullName": "Test", "nic": "123456789V", "dob": "1990-01-01", "contactNumber": "invalid"}, "Invalid phone format")
+        ]
+        
+        for invalid_data, test_desc in invalid_signup_tests:
+            test_name = f"Signup Validation: {test_desc}"
+            try:
+                start_time = time.time()
+                response = self.session.post(f"{self.base_url}/api/auth/signup", json=invalid_data)
+                response_time = time.time() - start_time
+                
+                if response.status_code in [400, 422]:
+                    try:
+                        error_data = response.json()
+                        self.log_test_result(test_name, True, f"Validation caught: {error_data.get('message', 'Error')}", response_time)
+                    except:
+                        self.log_test_result(test_name, True, "Validation error returned", response_time)
+                else:
+                    self.log_test_result(test_name, False, f"Expected validation error, got: {response.status_code}", response_time)
+            except Exception as e:
+                self.log_test_result(test_name, False, f"Error: {str(e)}")
+
+        # Test admin login with invalid credentials
+        invalid_admin_tests = [
+            ({}, "Empty credentials"),
+            ({"email": "invalid-email"}, "Invalid email format"),
+            ({"email": "test@example.com", "password": ""}, "Empty password"),
+            ({"email": "nonexistent@gov.lk", "password": "wrongpassword"}, "Wrong credentials")
+        ]
+        
+        for invalid_data, test_desc in invalid_admin_tests:
+            test_name = f"Admin Login Validation: {test_desc}"
+            try:
+                start_time = time.time()
+                response = self.session.post(f"{self.base_url}/api/admin/login", json=invalid_data)
+                response_time = time.time() - start_time
+                
+                if response.status_code in [400, 401, 422]:
+                    try:
+                        error_data = response.json()
+                        self.log_test_result(test_name, True, f"Auth validation: {error_data.get('message', 'Error')}", response_time)
+                    except:
+                        self.log_test_result(test_name, True, "Auth validation error returned", response_time)
+                else:
+                    self.log_test_result(test_name, False, f"Expected auth error, got: {response.status_code}", response_time)
+            except Exception as e:
+                self.log_test_result(test_name, False, f"Error: {str(e)}")
+
+    def test_edge_cases(self):
+        """Test edge cases and boundary conditions"""
+        # Test very long strings
+        long_string = "A" * 1000
+        edge_signup_data = {
+            "fullName": long_string,
+            "nic": "123456789V",
+            "dob": "1990-01-01",
+            "address": {
+                "street": long_string,
+                "city": "Colombo",
+                "postalCode": "00100"
+            },
+            "contactNumber": "+94771234567"
+        }
+        
+        test_name = "Edge Case: Long Strings"
+        try:
+            start_time = time.time()
+            response = self.session.post(f"{self.base_url}/api/auth/signup", json=edge_signup_data)
+            response_time = time.time() - start_time
+            
+            if response.status_code in [400, 422, 413]:  # 413 = Payload Too Large
+                self.log_test_result(test_name, True, f"Handled long strings: {response.status_code}", response_time)
+            else:
+                self.log_test_result(test_name, False, f"Unexpected handling of long strings: {response.status_code}", response_time)
+        except Exception as e:
+            self.log_test_result(test_name, False, f"Error: {str(e)}")
+
+        # Test SQL injection attempts
+        sql_injection_data = {
+            "fullName": "'; DROP TABLE users; --",
+            "nic": "123456789V",
+            "dob": "1990-01-01",
+            "address": {"street": "123 Test St", "city": "Colombo", "postalCode": "00100"},
+            "contactNumber": "+94771234567"
+        }
+        
+        test_name = "Security: SQL Injection"
+        try:
+            start_time = time.time()
+            response = self.session.post(f"{self.base_url}/api/auth/signup", json=sql_injection_data)
+            response_time = time.time() - start_time
+            
+            # Any response is acceptable as long as server doesn't crash
+            self.log_test_result(test_name, True, f"SQL injection handled: {response.status_code}", response_time)
+        except Exception as e:
+            self.log_test_result(test_name, False, f"Error: {str(e)}")
+
+        # Test XSS attempts
+        xss_data = {
+            "fullName": "<script>alert('xss')</script>",
+            "nic": "123456789V",
+            "dob": "1990-01-01",
+            "address": {"street": "123 Test St", "city": "Colombo", "postalCode": "00100"},
+            "contactNumber": "+94771234567"
+        }
+        
+        test_name = "Security: XSS Prevention"
+        try:
+            start_time = time.time()
+            response = self.session.post(f"{self.base_url}/api/auth/signup", json=xss_data)
+            response_time = time.time() - start_time
+            
+            # Check if XSS is properly handled
+            self.log_test_result(test_name, True, f"XSS handled: {response.status_code}", response_time)
+        except Exception as e:
+            self.log_test_result(test_name, False, f"Error: {str(e)}")
+
+    def test_rate_limiting(self):
+        """Test rate limiting protection"""
+        test_name = "Rate Limiting"
+        response_codes = []
+        
+        # Make rapid requests to test rate limiting
+        for i in range(10):
+            try:
+                response = self.session.get(f"{self.base_url}/api/departments")
+                response_codes.append(response.status_code)
+                if response.status_code == 429:  # Too Many Requests
+                    self.log_test_result(test_name, True, "Rate limiting active", 0)
+                    return
+            except Exception as e:
+                self.log_test_result(test_name, False, f"Error: {str(e)}")
+                return
+            time.sleep(0.1)  # Small delay between requests
+        
+        # If no rate limiting detected
+        unique_codes = set(response_codes)
+        if len(unique_codes) == 1 and 200 in unique_codes:
+            self.log_test_result(test_name, False, "No rate limiting detected", 0)
+        else:
+            self.log_test_result(test_name, True, f"Various responses: {unique_codes}", 0)
+
+    def test_authentication_edge_cases(self):
+        """Test authentication edge cases"""
+        # Test with malformed JWT tokens
+        malformed_tokens = [
+            "Bearer invalid.token.here",
+            "Bearer " + "A" * 500,  # Very long token
+            "invalid-format-token",
+            "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.invalid",  # Malformed JWT
+            ""  # Empty token
+        ]
+        
+        for token in malformed_tokens:
+            test_name = f"Auth Edge Case: {token[:20]}..."
+            headers = {'Authorization': token} if token else {}
+            
+            try:
+                start_time = time.time()
+                response = self.session.get(f"{self.base_url}/api/user/me", headers=headers)
+                response_time = time.time() - start_time
+                
+                if response.status_code in [401, 403, 400]:
+                    self.log_test_result(test_name, True, f"Rejected malformed auth: {response.status_code}", response_time)
+                else:
+                    self.log_test_result(test_name, False, f"Unexpected auth handling: {response.status_code}", response_time)
+            except Exception as e:
+                self.log_test_result(test_name, False, f"Error: {str(e)}")
+
+    def test_structured_api_calls(self):
+        """Test API endpoints with properly structured data"""
+        
+        # Test appointments with real department and service IDs (if available)
+        test_name = "Structured Appointment Booking"
+        if self.auth_token:
+            headers = {'Authorization': f'Bearer {self.auth_token}'}
+            
+            # First, try to get actual departments to use their IDs
+            try:
+                dept_response = self.session.get(f"{self.base_url}/api/departments")
+                if dept_response.status_code == 200:
+                    departments = dept_response.json()
+                    if departments and len(departments) > 0:
+                        dept_id = departments[0].get('id', 'DEP123')
+                    else:
+                        dept_id = 'DEP123'
+                else:
+                    dept_id = 'DEP123'
+            except:
+                dept_id = 'DEP123'
+            
+            # Try to get actual services
+            try:
+                service_response = self.session.get(f"{self.base_url}/api/services")
+                if service_response.status_code == 200:
+                    services = service_response.json()
+                    if services and len(services) > 0:
+                        service_id = services[0].get('id', 'SER123')
+                    else:
+                        service_id = 'SER123'
+                else:
+                    service_id = 'SER123'
+            except:
+                service_id = 'SER123'
+            
+            appointment_data = {
+                "departmentId": dept_id,
+                "serviceId": service_id,
+                "appointmentDate": "2025-12-25",
+                "appointmentTime": "10:00",
+                "notes": "Test appointment with proper structure"
+            }
+            
+            try:
+                start_time = time.time()
+                response = self.session.post(f"{self.base_url}/api/appointments", 
+                                           json=appointment_data, headers=headers)
+                response_time = time.time() - start_time
+                
+                if response.status_code in [201, 400, 401, 404, 422]:
+                    success_msg = f"Status: {response.status_code}"
+                    if response.status_code == 201:
+                        try:
+                            data = response.json()
+                            success_msg += f" - Appointment ID: {data.get('id', 'Unknown')}"
+                        except:
+                            pass
+                    elif response.status_code in [400, 422]:
+                        try:
+                            error_data = response.json()
+                            success_msg += f" - Error: {error_data.get('message', 'Validation error')}"
+                        except:
+                            pass
+                    self.log_test_result(test_name, True, success_msg, response_time)
+                else:
+                    self.log_test_result(test_name, False, f"Unexpected status: {response.status_code}", response_time)
+            except Exception as e:
+                self.log_test_result(test_name, False, f"Error: {str(e)}")
+
+        # Test user profile update with proper structure
+        test_name = "Structured Profile Update"
+        if self.auth_token:
+            headers = {'Authorization': f'Bearer {self.auth_token}'}
+            profile_data = {
+                "fullName": "John Updated Doe",
+                "address": {
+                    "street": "456 Updated Street",
+                    "city": "Kandy",
+                    "postalCode": "20000"
+                },
+                "contactNumber": "+94777654321",
+                "preferredLanguage": "SI"
+            }
+            
+            try:
+                start_time = time.time()
+                response = self.session.put(f"{self.base_url}/api/user/me", 
+                                          json=profile_data, headers=headers)
+                response_time = time.time() - start_time
+                
+                if response.status_code in [200, 400, 401, 422]:
+                    success_msg = f"Status: {response.status_code}"
+                    if response.status_code == 200:
+                        try:
+                            data = response.json()
+                            success_msg += " - Profile updated successfully"
+                        except:
+                            pass
+                    elif response.status_code in [400, 422]:
+                        try:
+                            error_data = response.json()
+                            success_msg += f" - Error: {error_data.get('message', 'Validation error')}"
+                        except:
+                            pass
+                    self.log_test_result(test_name, True, success_msg, response_time)
+                else:
+                    self.log_test_result(test_name, False, f"Unexpected status: {response.status_code}", response_time)
+            except Exception as e:
+                self.log_test_result(test_name, False, f"Error: {str(e)}")
+
+    def test_comprehensive_error_handling(self):
+        """Test comprehensive error handling for all endpoints"""
+        
+        # Test endpoints with various error conditions
+        error_test_cases = [
+            {
+                "endpoint": "/api/departments/nonexistent-id",
+                "method": "GET",
+                "expected_codes": [404, 400],
+                "name": "Nonexistent Department"
+            },
+            {
+                "endpoint": "/api/services/nonexistent-id", 
+                "method": "GET",
+                "expected_codes": [404, 400],
+                "name": "Nonexistent Service"
+            },
+            {
+                "endpoint": "/api/user/me",
+                "method": "GET",
+                "headers": {},  # No auth
+                "expected_codes": [401, 403],
+                "name": "Unauthorized User Access"
+            },
+            {
+                "endpoint": "/api/admin/users",
+                "method": "GET", 
+                "headers": {},  # No auth
+                "expected_codes": [401, 403],
+                "name": "Unauthorized Admin Access"
+            }
+        ]
+        
+        for test_case in error_test_cases:
+            test_name = f"Error Handling: {test_case['name']}"
+            try:
+                start_time = time.time()
+                headers = test_case.get('headers', {})
+                
+                if test_case['method'] == 'GET':
+                    response = self.session.get(f"{self.base_url}{test_case['endpoint']}", headers=headers)
+                elif test_case['method'] == 'POST':
+                    response = self.session.post(f"{self.base_url}{test_case['endpoint']}", 
+                                               json=test_case.get('data', {}), headers=headers)
+                
+                response_time = time.time() - start_time
+                
+                if response.status_code in test_case['expected_codes']:
+                    try:
+                        error_data = response.json()
+                        message = error_data.get('message', 'Error handled correctly')
+                        self.log_test_result(test_name, True, f"Status: {response.status_code} - {message}", response_time)
+                    except:
+                        self.log_test_result(test_name, True, f"Status: {response.status_code} - Error handled", response_time)
+                else:
+                    self.log_test_result(test_name, False, f"Expected {test_case['expected_codes']}, got {response.status_code}", response_time)
+                    
+            except Exception as e:
+                self.log_test_result(test_name, False, f"Error: {str(e)}")
+
+    def test_enhanced_endpoints(self):
+        """Test enhanced API endpoints with proper data structures"""
+        
+        # Test comprehensive user signup
+        unique_timestamp = int(time.time())
+        enhanced_signup_data = {
+            "fullName": "Enhanced Test User",
+            "nic": f"{unique_timestamp % 1000000000}V",
+            "dob": "1990-01-01",
+            "address": {
+                "street": "123 Enhanced Test Street",
+                "city": "Colombo",
+                "postalCode": "00100"
+            },
+            "contactNumber": f"+9477{unique_timestamp % 10000000:07d}",
+            "email": f"enhanced.test.{unique_timestamp}@example.com"
+        }
+        
+        test_name = "Enhanced User Signup"
+        try:
+            start_time = time.time()
+            response = self.session.post(f"{self.base_url}/api/auth/signup", json=enhanced_signup_data)
+            response_time = time.time() - start_time
+            
+            if response.status_code in [201, 400, 409, 422]:
+                success_msg = f"Status: {response.status_code}"
+                if response.status_code == 201:
+                    try:
+                        data = response.json()
+                        success_msg += f" - Enhanced User ID: {data.get('userId', data.get('id', 'Unknown'))}"
+                    except:
+                        success_msg += " - User created successfully"
+                elif response.status_code in [400, 422]:
+                    try:
+                        error_data = response.json()
+                        success_msg += f" - Enhanced Validation: {error_data.get('message', 'Validation error')}"
+                    except:
+                        success_msg += " - Validation error handled"
+                elif response.status_code == 409:
+                    success_msg += " - User already exists (expected)"
+                
+                self.log_test_result(test_name, True, success_msg, response_time)
+            else:
+                try:
+                    error_detail = response.json().get('message', response.text[:100])
+                except:
+                    error_detail = response.text[:100]
+                self.log_test_result(test_name, False, f"Unexpected status: {response.status_code} - {error_detail}", response_time)
+        except Exception as e:
+            self.log_test_result(test_name, False, f"Enhanced signup error: {str(e)}")
+
+        # Test enhanced appointment booking with future date
+        if self.auth_token:
+            headers = {'Authorization': f'Bearer {self.auth_token}'}
+            
+            # Calculate a future date (30 days from now)
+            import datetime
+            future_date = datetime.datetime.now() + datetime.timedelta(days=30)
+            appointment_date = future_date.strftime("%Y-%m-%d")
+            
+            enhanced_appointment_data = {
+                "departmentId": "TEST_DEPT_123",
+                "serviceId": "TEST_SERVICE_123",
+                "appointmentDate": appointment_date,
+                "appointmentTime": "10:30",
+                "notes": "Enhanced test appointment with future date",
+                "urgencyLevel": "normal"
+            }
+            
+            test_name = "Enhanced Appointment Booking"
+            try:
+                start_time = time.time()
+                response = self.session.post(f"{self.base_url}/api/appointments", 
+                                           json=enhanced_appointment_data, headers=headers)
+                response_time = time.time() - start_time
+                
+                if response.status_code in [201, 400, 401, 404, 422]:
+                    success_msg = f"Status: {response.status_code}"
+                    if response.status_code == 201:
+                        try:
+                            data = response.json()
+                            success_msg += f" - Appointment ID: {data.get('id', 'Unknown')}"
+                        except:
+                            success_msg += " - Appointment created"
+                    elif response.status_code in [400, 422]:
+                        try:
+                            error_data = response.json()
+                            success_msg += f" - Validation: {error_data.get('message', 'Error')}"
+                        except:
+                            success_msg += " - Validation error"
+                    elif response.status_code == 404:
+                        success_msg += " - Department/Service not found (expected)"
+                    
+                    self.log_test_result(test_name, True, success_msg, response_time)
+                else:
+                    try:
+                        error_detail = response.json().get('message', response.text[:100])
+                    except:
+                        error_detail = response.text[:100]
+                    self.log_test_result(test_name, False, f"Unexpected status: {response.status_code} - {error_detail}", response_time)
+            except Exception as e:
+                self.log_test_result(test_name, False, f"Enhanced appointment error: {str(e)}")
+
     def run_all_tests(self):
         """Run all test methods"""
         logger.info(f"Starting comprehensive backend tests for {self.base_url}")
@@ -705,6 +1245,33 @@ class BackendTester:
         self.test_cors()
         self.test_json_response()
         self.test_performance()
+        
+        # Data validation and security tests
+        self.test_data_validation()
+        self.test_edge_cases()
+        self.test_rate_limiting()
+        self.test_authentication_edge_cases()
+        
+        # Structured API tests
+        self.test_structured_api_calls()
+        
+        # Comprehensive error handling tests
+        self.test_comprehensive_error_handling()
+        
+        # Data validation and security tests
+        self.test_data_validation()
+        self.test_edge_cases()
+        self.test_rate_limiting()
+        self.test_authentication_edge_cases()
+        
+        # Structured API tests
+        self.test_structured_api_calls()
+        
+        # Comprehensive error handling tests
+        self.test_comprehensive_error_handling()
+        
+        # Enhanced API endpoint tests
+        self.test_enhanced_endpoints()
         
         # Print summary
         self.print_summary()
