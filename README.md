@@ -1,5 +1,46 @@
 # API Documentation
 
+## Local Setup (Docker)
+
+The entire backend system, including the database, is containerized with Docker and can be run with a single command. This is the recommended way to run the application for local development.
+
+**Prerequisites:**
+- Docker
+- Docker Compose
+
+### 1. Configure Environment
+
+First, create a `.env` file for your local environment variables. You can copy the provided example file:
+
+```bash
+cp .env.example .env
+```
+
+Next, open the `.env` file and change the values for `JWT_SECRET` and `ENCRYPTION_KEY` to your own long, random, secret strings.
+
+### 2. Build and Run
+
+Use Docker Compose to build the API image and start both the API and PostgreSQL containers.
+
+```bash
+docker-compose up --build
+```
+
+This command will:
+- Build the Docker image for the API.
+- Start the API and database containers.
+- Automatically apply all Prisma database migrations.
+- Seed the database with a default super admin user.
+
+The API will be available at `http://localhost:3000`.
+
+### Default Super Admin Credentials
+
+- **Email:** `superadmin@gov.lk`
+- **Password:** `password123`
+
+---
+
 This document provides the definitive documentation for the Government Agency Booking App API.
 
 ## Base URL
@@ -108,6 +149,33 @@ Verifies the OTP and returns a JWT token.
     }
     ```
 
+### `GET /auth/validate`
+
+Validates a JWT token. This is a public endpoint that allows any client to check the validity and expiration of a given token.
+
+**Authorization:** Public
+
+**Request Headers:**
+*   `Authorization: Bearer <your_jwt_token>` (required)
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:**
+    ```json
+    {
+      "message": "Token is valid"
+    }
+    ```
+
+**Error Responses:**
+
+*   **Code:** `400 Bad Request`
+*   **Content:** `{ "message": "Token not provided" }`
+
+*   **Code:** `401 Unauthorized`
+*   **Content:** `{ "message": "Invalid or expired token" }`
+
 ---
 
 ## Admin Authentication
@@ -143,9 +211,15 @@ Logs in an admin or super admin user and returns a JWT token.
 
 ### `GET /departments`
 
-Get all departments.
+Get all departments. Can be sorted by city.
 
 **Authorization:** Public
+
+**Query Parameters:**
+* `sortBy` (string, optional): Field to sort by. Currently supports `city`.
+* `order` (string, optional): Sort order. Accepts `asc` (default) or `desc`.
+
+**Example:** `GET /api/departments?sortBy=city&order=desc`
 
 **Success Response:**
 
@@ -296,14 +370,31 @@ Create a new service.
     "requiredDocuments": {
         "usual": {
             "National ID Copy": true,
-            "Birth Certificate": true
+            "Birth Certificate": false,
+            "Passport Copy": true,
+            "Marriage Certificate": false,
+            "Medical Certificate": true,
+            "Educational Certificates": false,
+            "Employment Letter": true,
+            "Bank Statements": false,
+            "Utility Bills": true,
+            "Police Clearance": false
         },
         "other": ["Any other relevant documents", "Additional document"]
     },
     "eligibilityCriteria": "Must be over 18 years old.",
     "onlineAvailable": true,
     "appointmentRequired": true,
-    "maxCapacityPerSlot": 10
+    "maxCapacityPerSlot": 10,
+    "operationalHours": {
+        "monday": ["09:00", "10:00", "11:00"],
+        "tuesday": [],
+        "wednesday": ["13:00", "14:00", "15:00"],
+        "thursday": ["09:00", "10:00", "11:00"],
+        "friday": ["09:00", "10:00"],
+        "saturday": [],
+        "sunday": []
+    }
 }
 ```
 
@@ -328,7 +419,12 @@ Update a service.
     "serviceName": "Driving License Renewal",
     "feeAmount": 500.00,
     "isActive": true,
-    "maxCapacityPerSlot": 8
+        "maxCapacityPerSlot": 8,
+    "operationalHours": {
+        "monday": ["09:00", "10:00", "11:00"],
+        "tuesday": [],
+        "wednesday": ["13:00", "14:00", "15:00"]
+    }
 }
 ```
 
@@ -357,7 +453,7 @@ Get all services for a specific department.
 
 ### `GET /appointments/:serviceId/slots`
 
-Get available appointment slots for a service on a specific date, including current queue size and max capacity.
+Get available appointment slots for a service on a specific date.
 
 **Authorization:** Public
 
@@ -371,18 +467,8 @@ Get available appointment slots for a service on a specific date, including curr
     ```json
     {
         "slots": [
-            {
-                "time": "07:00",
-                "currentQueueSize": 2,
-                "maxCapacity": 6,
-                "isAvailable": true
-            },
-            {
-                "time": "08:00",
-                "currentQueueSize": 6,
-                "maxCapacity": 6,
-                "isAvailable": false
-            }
+            { "time": "07:00", "currentQueueSize": 2, "maxCapacity": 6, "isAvailable": true },
+            { "time": "08:00", "currentQueueSize": 6, "maxCapacity": 6, "isAvailable": false }
         ]
     }
     ```
@@ -391,7 +477,7 @@ Get available appointment slots for a service on a specific date, including curr
 
 Book a new appointment.
 
-**Authorization:** Citizen, Admin, Super Admin
+**Authorization:** Authenticated User
 
 **Request Body:**
 
@@ -410,70 +496,161 @@ Book a new appointment.
 *   **Code:** `201 Created`
 *   **Content:** `The created Appointment object`
 
-**Error Responses:**
+---
 
-*   **Code:** `409 Conflict` - This time slot is full.
+## User
 
-### `POST /appointments/:appointmentId/documents`
+Endpoints for the logged-in user.
 
-Associates an externally stored document with an appointment.
+### `GET /api/user/me`
+
+Retrieves the profile of the currently logged-in user.
 
 **Authorization:** Authenticated User
 
-**Path Parameters:**
-* `appointmentId` (string, required): The ID of the appointment.
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `User Object` (password hash is excluded)
+
+### `PUT /api/user/me`
+
+Updates the profile of the currently logged-in user.
+
+**Authorization:** Authenticated User
 
 **Request Body:**
 
 ```json
 {
-    "externalDocumentId": "<id_from_external_service>"
+    "firstName": "John Updated",
+    "lastName": "Doe",
+    "phone": "+94777654321",
+    "address": {"street": "456 Park Ave", "city": "Kandy"},
+    "preferredLanguage": "SI"
 }
 ```
 
 **Success Response:**
 
-*   **Code:** `201 Created`
-*   **Content:** `The created SubmittedDocument object`
+*   **Code:** `200 OK`
+*   **Content:** `The updated User object`
 
----
+### `GET /api/user/appointments`
 
-## User
+Get all appointments for the logged-in user. Can be filtered by appointment status.
 
-### `GET /user/appointments`
+**Authorization:** Authenticated User
 
-Get all appointments for the logged-in citizen.
+**Query Parameters:**
+* `status` (string, optional): Filter appointments by status. Accepts values from `AppointmentStatus` enum (e.g., `scheduled`, `completed`, `cancelled`).
 
-**Authorization:** Citizen
+**Example:** `GET /api/user/appointments?status=scheduled`
 
 **Success Response:**
 
 *   **Code:** `200 OK`
 *   **Content:** `Array of Appointment objects`
 
+### `PUT /api/user/appointments/:appointmentId/cancel`
+
+Cancels an appointment owned by the logged-in user.
+
+**Authorization:** Authenticated User
+
+**Path Parameters:**
+* `appointmentId` (string, required): The ID of the appointment to cancel.
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `The updated Appointment object` with status `cancelled`.
+
 ---
 
 ## Admin
 
-### `GET /admin/appointments`
+### Admin Appointment Management
 
-Get all appointments for the admin's department.
+These endpoints allow Admins and Super Admins to manage appointments. For users with the `ADMIN` role, access is restricted to appointments for services they are assigned to. `SUPER_ADMIN` users have unrestricted access.
+
+#### `GET /api/admin/appointments`
+
+Get appointments. For Admins, this is scoped to their assigned services. For Super Admins, it returns all appointments. The response includes the user, service, and submitted documents for each appointment.
 
 **Authorization:** Admin, Super Admin
 
 **Success Response:**
 
 *   **Code:** `200 OK`
-*   **Content:** `Array of detailed Appointment objects` (See structure in previous documentation version)
+*   **Content:** `Array of detailed Appointment objects`
 
-### `PUT /admin/appointments/:appointmentId`
+**Example Response Body:**
+```json
+[
+    {
+        "appointmentId": "APP1723532294023",
+        "userId": "USR1723532294023",
+        "departmentId": "DEP1723532294023",
+        "serviceId": "SER1723532294023",
+        "appointmentDate": "2025-12-25T00:00:00.000Z",
+        "appointmentTime": "1970-01-01T10:00:00.000Z",
+        "status": "scheduled",
+        "notes": "I need this urgently.",
+        "createdAt": "2025-08-13T12:00:00.000Z",
+        "updatedAt": "2025-08-13T12:00:00.000Z",
+        "user": {
+            "userId": "USR1723532294023",
+            "firstName": "John",
+            "lastName": "Doe",
+            "email": "john.doe@example.com"
+        },
+        "service": {
+            "serviceId": "SER1723532294023",
+            "serviceName": "New Driving License"
+        },
+        "submittedDocuments": [
+            {
+                "documentId": "clv2...",
+                "externalDocumentId": "<uuid>",
+                "originalFilename": "mydocument.pdf",
+                "isApproved": true,
+                "remarks": "Document looks good."
+            }
+        ]
+    }
+]
+```
 
-Update the status of an appointment.
+#### `POST /api/admin/appointments`
+
+Create a new appointment. Admins can only create appointments for services they are assigned to.
 
 **Authorization:** Admin, Super Admin
 
-**Path Parameters:**
-* `appointmentId` (string, required): The ID of the appointment to update.
+**Request Body:**
+
+```json
+{
+    "userId": "USR...",
+    "departmentId": "DEP...",
+    "serviceId": "SER...",
+    "appointmentDate": "2025-12-25",
+    "appointmentTime": "11:00",
+    "notes": "Created by admin."
+}
+```
+
+**Success Response:**
+
+*   **Code:** `201 Created`
+*   **Content:** `The created Appointment object`
+
+#### `PUT /api/admin/appointments/:appointmentId`
+
+Update the status or notes of an appointment. Admins can only update appointments for services they are assigned to.
+
+**Authorization:** Admin, Super Admin
 
 **Request Body:**
 
@@ -489,28 +666,133 @@ Update the status of an appointment.
 *   **Code:** `200 OK`
 *   **Content:** `The updated Appointment object`
 
-### `PUT /admin/documents/:documentId`
+#### `DELETE /api/admin/appointments/:appointmentId`
 
-Update the status of a submitted document.
+Deletes an appointment. Admins can only delete appointments for services they are assigned to.
 
 **Authorization:** Admin, Super Admin
 
 **Path Parameters:**
-* `documentId` (string, required): The internal ID of the document record to update.
+* `appointmentId` (string, required): The ID of the appointment to delete.
+
+**Success Response:**
+
+*   **Code:** `204 No Content`
+
+### Admin Management (Super Admin Only)
+
+These endpoints are used to manage Admin accounts and are restricted to users with the `SUPER_ADMIN` role.
+
+#### `GET /api/admin/admins`
+
+Retrieves a list of all users with the `ADMIN` role and their assigned services.
+
+**Authorization:** Super Admin
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `Array of Admin User objects` (includes `assignedServices`)
+
+#### `POST /api/admin/admins`
+
+Creates a new Admin user and optionally assigns them to services.
+
+**Authorization:** Super Admin
 
 **Request Body:**
 
 ```json
 {
-    "isApproved": true,
-    "remarks": "Document looks good."
+    "email": "new.admin@gov.lk",
+    "password": "a-strong-password",
+    "firstName": "New",
+    "lastName": "Admin",
+    "serviceIds": ["SER...", "SER..."]
+}
+```
+
+**Success Response:**
+
+*   **Code:** `201 Created`
+*   **Content:** `The created Admin User object`
+
+#### `PUT /api/admin/admins/:userId`
+
+Updates an existing Admin user's details and service assignments.
+
+**Authorization:** Super Admin
+
+**Path Parameters:**
+* `userId` (string, required): The ID of the admin user to update.
+
+**Request Body:**
+
+```json
+{
+    "email": "updated.admin@gov.lk",
+    "firstName": "Updated",
+    "isActive": false,
+    "serviceIds": ["SER..."]
 }
 ```
 
 **Success Response:**
 
 *   **Code:** `200 OK`
-*   **Content:** `The updated SubmittedDocument object`
+*   **Content:** `The updated Admin User object`
+
+#### `DELETE /api/admin/admins/:userId`
+
+Deletes an Admin user.
+
+**Authorization:** Super Admin
+
+**Path Parameters:**
+* `userId` (string, required): The ID of the admin user to delete.
+
+**Success Response:**
+
+*   **Code:** `204 No Content`
+
+### User Management (Super Admin Only)
+
+#### `GET /api/admin/users`
+
+Retrieves a list of all users (all roles).
+
+**Authorization:** Super Admin
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `Array of User objects`
+
+#### `PUT /api/admin/users/:userId`
+
+Updates any existing user's details, including their role.
+
+**Authorization:** Super Admin
+
+**Path Parameters:**
+* `userId` (string, required): The ID of the user to update.
+
+**Request Body:**
+
+```json
+{
+    "email": "some.user@example.com",
+    "firstName": "Some",
+    "lastName": "User",
+    "isActive": true,
+    "role": "CITIZEN"
+}
+```
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** `The updated User object`
 
 ### Citizen Management (Super Admin Only)
 
@@ -578,9 +860,32 @@ Retrieves all appointments for a specific citizen.
 *   **Code:** `200 OK`
 *   **Content:** `Array of Appointment objects` (fully populated with service, department, and document details)
 
-### Citizen Management (Super Admin Only)
+---
 
-#### `GET /api/feedback`
+## Feedback
+
+### `POST /api/feedback`
+
+Submits feedback for a completed appointment.
+
+**Authorization:** Authenticated User (Citizen)
+
+**Request Body:**
+
+```json
+{
+    "appointmentId": "APP1723532294023",
+    "rating": 5,
+    "remarks": "Excellent service!"
+}
+```
+
+**Success Response:**
+
+*   **Code:** `201 Created`
+*   **Content:** `The created Feedback object`
+
+### `GET /api/feedback`
 
 Retrieves feedback.
 - **Super Admins** get all feedback.
@@ -594,58 +899,57 @@ Retrieves feedback.
 *   **Code:** `200 OK`
 *   **Content:** `Array of Feedback objects` (each object includes `appointment.service.serviceId` and `appointment.service.serviceName`)
 
-#### `GET /api/admin/citizens/:id`
+### `GET /api/feedback/stats`
 
-Retrieves a single citizen user by their ID.
+Retrieves feedback statistics.
+- **Super Admins** get stats for all feedback.
+- **Admins** get stats for services they are assigned to.
 
-**Authorization:** Super Admin
-
-**Path Parameters:**
-* `id` (string, required): The ID of the citizen user.
+**Authorization:** Authenticated User (Admin, Super Admin)
 
 **Success Response:**
 
 *   **Code:** `200 OK`
-*   **Content:** `A single Citizen User object`
+*   **Content:**
+    ```json
+    {
+        "totalFeedback": 1456,
+        "averageRating": 4.1,
+        "responseRate": 87.3,
+        "positiveFeedback": 61,
+        "positive": 892,
+        "neutral": 324,
+        "negative": 240
+    }
+    ```
 
-#### `PUT /api/admin/citizens/:id`
+---
 
-Updates a citizen's details.
+## Analytics
 
-**Authorization:** Super Admin
+### `GET /api/analytics`
 
-**Path Parameters:**
-* `id` (string, required): The ID of the citizen user to update.
+Retrieves a comprehensive set of analytics data for the platform.
 
-**Request Body:**
+**Authorization:** Admin, Super Admin
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** A structured JSON object containing all analytics data.
+
+**Example Response Body:**
 
 ```json
 {
-    "email": "citizen.user@example.com",
-    "firstName": "Citizen",
-    "lastName": "User",
-    "isActive": true
+  "appointmentStats": { "totalThisMonth": 1250, "percentageChange": 12.5 },
+  "activeServiceStats": { "totalThisMonth": 45, "percentageChange": -5.2 },
+  "officerStats": { "totalOfficers": 85, "percentageChange": 2.4 },
+  "peakHoursToday": [ { "time": "09:00", "count": 25 }, { "time": "10:00", "count": 42 } ],
+  "departmentLoad": [ { "departmentName": "Dept of Motor Traffic", "count": 450 } ],
+  "quickStatsToday": { "completed": 55, "pending": 112, "noShows": 8, "cancelled": 4 }
 }
 ```
-
-**Success Response:**
-
-*   **Code:** `200 OK`
-*   **Content:** `The updated Citizen User object`
-
-#### `GET /api/admin/citizens/:id/appointments`
-
-Retrieves all appointments for a specific citizen.
-
-**Authorization:** Super Admin
-
-**Path Parameters:**
-* `id` (string, required): The ID of the citizen user.
-
-**Success Response:**
-
-*   **Code:** `200 OK`
-*   **Content:** `Array of Appointment objects` (fully populated with service, department, and document details)
 
 ---
 
@@ -707,10 +1011,156 @@ Retrieves all appointments for a specific citizen.
 {
     "documentId": "clv2...",
     "appointmentId": "APP1723532294023",
-    "externalDocumentId": "<id_from_external_service>",
+    "externalDocumentId": "<uuid>",
+    "filePath": "/path/to/uploads/encrypted/<uuid>",
+    "mimeType": "application/pdf",
+    "originalFilename": "mydocument.pdf",
+    "fileSizeBytes": 123456,
     "isApproved": true,
     "remarks": "Document looks good.",
     "createdAt": "2025-08-13T12:05:00.000Z",
     "updatedAt": "2025-08-13T12:10:00.000Z"
 }
 ```
+
+---
+
+## Real-time Queue System (WebSockets)
+
+The application uses WebSockets for real-time communication, primarily for managing and displaying appointment queues.
+
+### Connection
+
+Connect to the WebSocket server at the base URL (`http://localhost:3000`). The connection must be authenticated by providing a valid JWT token in the `auth` payload.
+
+```javascript
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:3000", {
+  auth: {
+    token: "<your_jwt_token>"
+  }
+});
+```
+
+### Emitting Events
+
+#### `join_service_queue`
+
+Joins the queue for a specific service to receive real-time updates.
+
+**Payload:** `serviceId` (string)
+
+**Example:**
+```javascript
+socket.emit('join_service_queue', 'SER1723532294023');
+```
+
+#### `book_appointment`
+
+Books a new appointment. This will also broadcast queue updates to all clients in the service queue and the admin dashboard.
+
+**Payload:** `AppointmentBookingData` (object)
+
+```json
+{
+  "departmentId": "DEP1723532294023",
+  "serviceId": "SER1723532294023",
+  "appointmentDate": "2025-12-25",
+  "appointmentTime": "10:00",
+  "notes": "I need this urgently."
+}
+```
+
+### Listening for Events
+
+#### `queue_update`
+
+Received when the number of people in a service queue changes.
+
+**Payload:**
+```json
+{
+  "serviceId": "SER1723532294023",
+  "slots": [
+    { "time": "09:00", "currentQueueSize": 5, "maxCapacity": 10, "isAvailable": true },
+    { "time": "10:00", "currentQueueSize": 10, "maxCapacity": 10, "isAvailable": false }
+  ]
+}
+```
+
+#### `appointment_booked`
+
+Received by the user who booked the appointment, confirming the booking.
+
+**Payload:** `Appointment Object`
+
+#### `admin_queue_update`
+
+Received by admins and super admins when a queue count changes.
+
+**Payload:**
+```json
+{
+  "serviceId": "SER1723532294023",
+  "slots": [
+    { "time": "09:00", "currentQueueSize": 5, "maxCapacity": 10, "isAvailable": true },
+    { "time": "10:00", "currentQueueSize": 10, "maxCapacity": 10, "isAvailable": false }
+  ]
+}
+```
+
+#### `error`
+
+Received when an error occurs.
+
+**Payload:**
+```json
+{
+  "message": "Error message here"
+}
+```
+
+---
+
+## File Upload & Serving
+
+File uploads are handled via a standard `multipart/form-data` endpoint. All uploaded files are encrypted at rest and can only be viewed via a public, unguessable link.
+
+### `POST /api/upload`
+
+Uploads a single file to be associated with an appointment.
+
+**Authorization:** Authenticated User
+
+**Request Type:** `multipart/form-data`
+
+**Form Data:**
+
+*   `appointmentId` (string, required): The ID of the appointment this document belongs to.
+*   `document` (file, required): The file to upload. The field name **must** be `document`.
+
+**Success Response:**
+
+*   **Code:** `201 Created`
+*   **Content:**
+    ```json
+    {
+        "message": "File uploaded and encrypted successfully.",
+        "document": { ...SubmittedDocument Object... }
+    }
+    ```
+
+### `GET /api/files/:externalDocumentId`
+
+Serves a decrypted file for viewing. This is a public endpoint.
+
+**Authorization:** Public
+
+**Path Parameters:**
+* `externalDocumentId` (string, required): The unique ID of the document to retrieve.
+
+**Success Response:**
+
+*   **Code:** `200 OK`
+*   **Content:** The raw, decrypted file stream.
