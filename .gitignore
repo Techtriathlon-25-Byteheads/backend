@@ -4,3 +4,7 @@ node_modules
 prisma/*.db
 prisma/migrations
 /uploads
+
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
